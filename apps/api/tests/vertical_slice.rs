@@ -348,11 +348,32 @@ async fn full_vertical_slice() {
     assert_eq!(r.body["version"], 2);
     assert_eq!(r.body["review_date"], "2027-03-01");
     assert_eq!(r.body["decision_maker_name"], "reviewer");
+    // Clearing optional fields with explicit nulls (as the web client does).
+    let r = owner
+        .patch(
+            &dpath,
+            json!({ "base_version": 2, "title": "Use base isolation", "problem_statement": "Seismic risk",
+                    "alternatives": "Isolation; Dampers", "outcome": "Base isolation",
+                    "decision_maker_id": reviewer_id, "review_date": null }),
+        )
+        .await;
+    assert_eq!(
+        r.status,
+        StatusCode::OK,
+        "explicit null review_date: {}",
+        r.text
+    );
+    assert_eq!(r.body["review_date"], serde_json::Value::Null);
+    let bad = owner
+        .patch(&dpath, json!({ "base_version": 3, "title": "x", "problem_statement": "y", "review_date": "next week" }))
+        .await;
+    assert_eq!(bad.status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(bad.body["error"]["field"], "review_date");
 
     let r = owner
         .post(
             &format!("{dpath}/transition"),
-            json!({ "to": "under_review", "base_version": 2 }),
+            json!({ "to": "under_review", "base_version": 3 }),
         )
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text);
@@ -360,7 +381,7 @@ async fn full_vertical_slice() {
     let r = owner
         .patch(
             &dpath,
-            json!({ "base_version": 3, "title": "Changed", "problem_statement": "x" }),
+            json!({ "base_version": 4, "title": "Changed", "problem_statement": "x" }),
         )
         .await;
     assert_eq!(r.status, StatusCode::CONFLICT);
@@ -368,14 +389,14 @@ async fn full_vertical_slice() {
     let r = reviewer
         .post(
             &format!("{dpath}/transition"),
-            json!({ "to": "approved", "base_version": 3 }),
+            json!({ "to": "approved", "base_version": 4 }),
         )
         .await;
     assert_eq!(r.status, StatusCode::UNPROCESSABLE_ENTITY);
     let r = reviewer
         .post(
             &format!("{dpath}/transition"),
-            json!({ "to": "approved", "base_version": 3, "confirm": true, "note": "Reviewed with team" }),
+            json!({ "to": "approved", "base_version": 4, "confirm": true, "note": "Reviewed with team" }),
         )
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text);
@@ -384,14 +405,14 @@ async fn full_vertical_slice() {
     let r = owner
         .patch(
             &dpath,
-            json!({ "base_version": 4, "title": "Rewrite history", "problem_statement": "x" }),
+            json!({ "base_version": 5, "title": "Rewrite history", "problem_statement": "x" }),
         )
         .await;
     assert_eq!(r.status, StatusCode::CONFLICT);
     let r = reviewer
         .post(
             &format!("{dpath}/transition"),
-            json!({ "to": "draft", "base_version": 4 }),
+            json!({ "to": "draft", "base_version": 5 }),
         )
         .await;
     assert_eq!(r.status, StatusCode::CONFLICT);
@@ -417,7 +438,7 @@ async fn full_vertical_slice() {
     let r = reviewer
         .post(
             &format!("{dpath}/transition"),
-            json!({ "to": "superseded", "base_version": 4, "confirm": true, "superseded_by": id2 }),
+            json!({ "to": "superseded", "base_version": 5, "confirm": true, "superseded_by": id2 }),
         )
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text);
@@ -427,8 +448,8 @@ async fn full_vertical_slice() {
     let history = history.body.as_array().unwrap();
     assert_eq!(
         history.len(),
-        5,
-        "created, edited, submitted, approved, superseded"
+        6,
+        "created, edited twice, submitted, approved, superseded"
     );
     assert_eq!(history[0]["status"], "superseded");
     assert_eq!(

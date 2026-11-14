@@ -89,8 +89,27 @@ pub struct DecisionInput {
     #[serde(flatten)]
     pub content: DecisionContent,
     pub decision_maker_id: Option<Uuid>,
-    #[serde(default, with = "iso_date::option")]
-    pub review_date: Option<Date>,
+    /// `YYYY-MM-DD` or null. Parsed explicitly: serde's `flatten` cannot
+    /// combine with a custom `with` deserializer for `null`.
+    #[serde(default)]
+    pub review_date: Option<String>,
+}
+
+impl DecisionInput {
+    fn review_date(&self) -> ApiResult<Option<Date>> {
+        match self.review_date.as_deref().map(str::trim) {
+            None | Some("") => Ok(None),
+            Some(s) => Date::parse(
+                s,
+                &time::macros::format_description!("[year]-[month]-[day]"),
+            )
+            .map(Some)
+            .map_err(|_| ApiError::Validation {
+                field: "review_date".into(),
+                message: "must be a date in YYYY-MM-DD format".into(),
+            }),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -129,6 +148,7 @@ pub async fn create(
     ApiPath((org, project)): ApiPath<(Uuid, Uuid)>,
     ApiJson(req): ApiJson<DecisionInput>,
 ) -> ApiResult<(StatusCode, Json<DecisionView>)> {
+    let review_date = req.review_date()?;
     let content = req.content.validated()?;
     let mut scope = OrgScope::open(&state, &session, org, Permission::DecisionsWrite).await?;
     // Locks the project row, which also serializes decision numbering.
@@ -142,7 +162,7 @@ pub async fn create(
         project,
         &content,
         req.decision_maker_id,
-        req.review_date,
+        review_date,
         scope.user.as_uuid(),
     )
     .await?;
@@ -179,6 +199,7 @@ pub async fn update(
     ApiPath((org, id)): ApiPath<(Uuid, Uuid)>,
     ApiJson(req): ApiJson<UpdateDecision>,
 ) -> ApiResult<Json<DecisionView>> {
+    let review_date = req.input.review_date()?;
     let content = req.input.content.validated()?;
     let mut scope = OrgScope::open(&state, &session, org, Permission::DecisionsWrite).await?;
     let current = load(&mut scope, id, false).await?;
@@ -202,7 +223,7 @@ pub async fn update(
         id,
         &content,
         req.input.decision_maker_id,
-        req.input.review_date,
+        review_date,
     )
     .await?;
     decisions::snapshot(&mut scope.tx, org, id, "Edited", scope.user.as_uuid()).await?;
