@@ -26,7 +26,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=api /src/target/release/quorum-api /app/quorum-api
 COPY --from=web /src/apps/web/dist /app/web
-ENV QUORUM_BIND=0.0.0.0:8080 \
+ENV PORT=8080 \
     QUORUM_WEB_DIR=/app/web \
     QUORUM_LOG_FORMAT=json
 USER 10001

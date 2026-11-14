@@ -32,6 +32,46 @@ async fn migrate() -> Result<(), String> {
         .await
         .map_err(|e| format!("migration failed: {e}"))?;
     tracing::info!("migrations applied");
+    ensure_app_login_role(&pool).await?;
+    Ok(())
+}
+
+/// On platforms that provide only one superuser (e.g. Railway Postgres),
+/// creates or updates the API's login role `quorum_api` as a member of
+/// `quorum_app`, with the password from `QUORUM_APP_DB_PASSWORD`. The role
+/// owns nothing and cannot bypass row-level security. Skipped when unset.
+async fn ensure_app_login_role(pool: &sqlx::PgPool) -> Result<(), String> {
+    let Ok(password) = std::env::var("QUORUM_APP_DB_PASSWORD") else {
+        return Ok(());
+    };
+    if password.len() < 24 {
+        return Err("QUORUM_APP_DB_PASSWORD must be at least 24 characters".into());
+    }
+    // format(%L) quotes the password as a literal inside PostgreSQL.
+    let exists: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'quorum_api')")
+            .fetch_one(pool)
+            .await
+            .map_err(|e| format!("role check: {e}"))?;
+    let template = if exists {
+        "SELECT format('ALTER ROLE quorum_api LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD %L', $1::text)"
+    } else {
+        "SELECT format('CREATE ROLE quorum_api LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD %L IN ROLE quorum_app', $1::text)"
+    };
+    let statement: String = sqlx::query_scalar(template)
+        .bind(&password)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("role statement: {e}"))?;
+    sqlx::raw_sql(sqlx::AssertSqlSafe(statement))
+        .execute(pool)
+        .await
+        .map_err(|_| "could not create or update role quorum_api".to_owned())?;
+    sqlx::raw_sql("GRANT quorum_app TO quorum_api")
+        .execute(pool)
+        .await
+        .map_err(|e| format!("grant: {e}"))?;
+    tracing::info!("application login role quorum_api ensured");
     Ok(())
 }
 

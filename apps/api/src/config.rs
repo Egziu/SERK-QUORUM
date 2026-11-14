@@ -80,10 +80,17 @@ impl Config {
 
     /// Builds configuration from any key lookup (used by tests).
     pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
-        let bind = get("QUORUM_BIND")
-            .unwrap_or_else(|| "127.0.0.1:8080".into())
-            .parse()
-            .map_err(|_| ConfigError::Invalid("QUORUM_BIND"))?;
+        // QUORUM_BIND wins; otherwise a platform-assigned PORT (e.g. Railway) binds all interfaces.
+        let bind = match (
+            get("QUORUM_BIND").filter(|v| !v.is_empty()),
+            get("PORT").filter(|v| !v.is_empty()),
+        ) {
+            (Some(b), _) => b,
+            (None, Some(port)) => format!("0.0.0.0:{}", port.trim()),
+            (None, None) => "127.0.0.1:8080".into(),
+        }
+        .parse()
+        .map_err(|_| ConfigError::Invalid("QUORUM_BIND"))?;
         let database_url = get("DATABASE_URL")
             .filter(|v| !v.is_empty())
             .ok_or(ConfigError::Missing("DATABASE_URL"))?;
@@ -167,6 +174,20 @@ mod tests {
         assert!(c.providers.configs.is_empty());
         assert_eq!(c.bind.to_string(), "127.0.0.1:8080");
         assert_eq!(c.session_cookie_name(), "__Host-quorum_session");
+    }
+
+    #[test]
+    fn platform_port_is_honoured_unless_bind_is_set() {
+        let c = cfg(&[("DATABASE_URL", "x"), ("PORT", "3000")]).expect("config");
+        assert_eq!(c.bind.to_string(), "0.0.0.0:3000");
+        let c = cfg(&[
+            ("DATABASE_URL", "x"),
+            ("PORT", "3000"),
+            ("QUORUM_BIND", "127.0.0.1:9000"),
+        ])
+        .expect("config");
+        assert_eq!(c.bind.to_string(), "127.0.0.1:9000");
+        assert!(cfg(&[("DATABASE_URL", "x"), ("PORT", "abc")]).is_err());
     }
 
     #[test]
