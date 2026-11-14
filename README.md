@@ -1,45 +1,72 @@
 # SERK QUORUM
 
-![QUORUM logo](public/logo.svg)
+<img src="assets/quorum-logo.svg" alt="QUORUM four-node logo" width="72">
 
-**Intelligence. In concert.** · Multi-AI Engineering Framework
+**Intelligence. In concert.** A vendor-independent organizational intelligence workspace: projects, versioned documents and a human-owned decision register, with explicit, text-only access to OpenAI, Anthropic, Google Gemini and xAI.
 
-Independent commercial product direction: a human-led multi-model workspace for engineering firms, product teams and research organizations. v0.1 is a **local, single-operator engineering preview**, not a production SaaS.
+> **Status: v0.2 engineering preview — not production-ready.** The Rust foundation and the first vertical slice (sign-in → organization → project → document → decision record) are implemented and tested. See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) for exactly what is implemented, verified, partial and planned. Do not use with real customer data.
 
-## Start testing
+## What works today
 
-Requires Node.js 22 or newer. No dependencies or provider keys needed for demo.
+| Area | Implemented in v0.2 |
+| --- | --- |
+| Identity | Local accounts (Argon2id), server-side sessions (HttpOnly cookie, revocation, expiry), CSRF protection, login throttling |
+| Organizations | Multi-tenant organizations, 8 roles, invitations, role changes, last-owner protection |
+| Tenant isolation | Application authorization **and** PostgreSQL row-level security; the API role owns no tables |
+| Projects | Create, edit, status (active / on hold / completed / archived — archived is read-only) |
+| Studio documents | 11 categories, append-only version history, optimistic concurrency, approval, Markdown export, AI-assisted labelling |
+| Decision register | Draft → under review → approved / rejected → superseded, frozen content, full history, explicit human confirmation |
+| Command | One provider, one text request; fixture mode (no network) or live with explicit consent; no silent fallback; usage ledger |
+| Audit | Append-only (for the app role) audit trail of security and business events with correlation IDs |
+| Web client | React + strict TypeScript; light/dark themes; responsive; WCAG 2.2 AA checks with axe-core |
 
-```sh
-npm test
-npm run check
-npm start
+Not yet built: OIDC/SSO, Council, Memory, Vault, Analytics, governance policies, billing, field encryption, PDF/DOCX export. These are tracked in [RELEASE_READINESS.md](docs/RELEASE_READINESS.md), not hidden behind placeholder screens.
+
+## Quick start (local development, synthetic data)
+
+Requirements: Rust 1.97 (pinned in `rust-toolchain.toml`; MSRV 1.88), Node.js 22+, PostgreSQL 16.
+
+```bash
+psql -v ON_ERROR_STOP=1 -f scripts/bootstrap-db.sql   # once, as a PostgreSQL superuser
+cp .env.example .env
+./scripts/dev.sh                                       # builds web + API, migrates, serves
 ```
 
-Open http://127.0.0.1:8080. Compare four clearly labeled fixture perspectives, create session projects, record decisions and export JSON. Data is intentionally session-only; refresh clears it. No telemetry or background tasks.
+Open http://127.0.0.1:8080 and create an organization. Fixture mode works without any provider keys.
 
-## Optional live text adapters
+Docker Compose alternative (definitions provided, **not yet verified in CI**): `docker compose -f deploy/docker/compose.yaml up --build`.
 
-Copy .env.example to .env; set QUORUM_LIVE=1, a strong random QUORUM_ACCESS_TOKEN (at least 32 characters), and the desired provider API key and model identifier. Start with `node --env-file=.env server.mjs`. Paste only the operator token into Connections. Select a provider, enter a non-sensitive brief and explicitly opt in to a live request. Configured does not mean verified. Keys remain server-side. API usage is billed separately by providers. Provider contracts and data policies must be reviewed before use.
+## Quality gates
 
-Live requests are single-provider, text-only, operator-initiated, with a timeout, one concurrent request, a five-second cooldown and an output-token limit. Demo comparisons are fixtures, not generated responses. No live multi-agent execution, automated handoffs, offensive security functionality, production credentials, shell, network tools or repository mutation. The application is deliberately loopback-only. Do not expose it to untrusted users.
+```bash
+export QUORUM_TEST_DATABASE_URL=postgres://quorum_owner:quorum_owner_dev@127.0.0.1:5432/postgres
+./scripts/check.sh
+```
 
-## Architecture
+Runs `cargo fmt --check`, `cargo clippy -D warnings`, all Rust tests (including PostgreSQL integration tests as the non-owner role), web typecheck/tests/build, and the legacy v0.1 suite. See [TESTING_GUIDE.md](docs/TESTING_GUIDE.md) for the browser acceptance test.
 
-- `public/`: responsive black/green/white interface, reusable QUORUM emblem and session workspace.
-- `lib/workspace.mjs`: provider registry, request validation, task catalog and demo fixtures.
-- `lib/providers.mjs`: fixed official provider HTTP adapters and response normalization.
-- `server.mjs`: local HTTP server, static assets, policy boundary and API.
-- `test/`: unit and mocked HTTP/provider integration tests.
-- `docs/PRODUCT.md`: commercial roadmap, security and release requirements.
+## Repository layout
 
-The live APIs are not tested against real accounts in this release. Model IDs are configuration, not hard-coded promises. No production security certification is claimed.
+```
+apps/api          Axum HTTP service (handlers, sessions, tenant scope)
+apps/web          React + TypeScript client (Vite)
+crates/quorum-domain     Pure domain model: ids, roles, validation, lifecycles
+crates/quorum-auth       Argon2id, opaque tokens, constant-time compare
+crates/quorum-storage    PostgreSQL repositories, tenant-scoped transactions
+crates/quorum-providers  OpenAI / Anthropic / Gemini / xAI adapters + fixtures
+migrations/       SQL migrations (RLS, grants, triggers)
+contracts/        OpenAPI 3.1 contract (kept in sync by tests)
+docs/             Architecture, ADRs, security, operations, product
+deploy/docker     Dockerfile and local Compose stack
+legacy/v0.1-node  The original v0.1 Node preview, preserved and still tested
+```
 
-## API references
+## Documentation
 
-- https://developers.openai.com/api/reference/resources/responses/methods/create
-- https://docs.anthropic.com/en/api/messages
-- https://ai.google.dev/api/generate-content
-- https://docs.x.ai/developers/rest-api-reference/inference/responses
+[Architecture](docs/ARCHITECTURE.md) · [Product vision](docs/product/PRODUCT_VISION.md) · [Security](SECURITY.md) · [Threat model](docs/security/THREAT_MODEL.md) · [Privacy architecture](docs/PRIVACY_ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) · [API reference](docs/API_REFERENCE.md) · [Development](docs/DEVELOPMENT_GUIDE.md) · [Testing](docs/TESTING_GUIDE.md) · [Deployment](docs/DEPLOYMENT_GUIDE.md) · [Operations](docs/operations/OPERATIONS_RUNBOOK.md) · [Backup & recovery](docs/operations/BACKUP_AND_RECOVERY.md) · [Release readiness](docs/RELEASE_READINESS.md) · [ADRs](docs/adr/) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-Copyright SERK Technologies Group. Commercial licensing terms are to be determined by the owner. No open-source license is implied.
+## Boundaries
+
+QUORUM is a planning, documentation and decision workspace. It contains no shell execution, autonomous agents, model-to-model loops, external target testing, exploit generation or automatic production changes. Model output is inert text reviewed by people; model agreement is not verification.
+
+Copyright © SERK Technologies Group. Commercial licensing terms are to be determined by the owner; no open-source licence is granted.
