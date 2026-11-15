@@ -2,6 +2,20 @@
 
 All notable changes are recorded here. Versions follow semantic versioning once 1.0 is released; before then, minor versions may break compatibility.
 
+## [0.3.0] — unreleased (engineering preview)
+
+### Added
+- **QUORUM Connect — Web Connect:** use ChatGPT, Claude, Gemini and Grok with your own accounts and no API key. Quick and professional briefs with immutable versions; built-in and custom role templates; deterministic instruction rendering with person-selected, versioned project context; approved handoffs stored with SHA-256; copy and open-official-website steps; paste or file import (.txt, .md, QUORUM JSON) labelled user-declared; duplicate detection; review status.
+- **Organization external sharing limit** by classification (public/internal/confidential/restricted), enforced server-side (`403 policy_blocked`).
+- **Council:** compare up to 12 responses side by side (tabs on phones), replace with history, annotations, per-person ratings on eight criteria, human decision recording into the Decision register, frozen completed councils, Markdown export and save as Studio document.
+- Migration `0002_web_connect_council.sql` with RLS, least-privilege grants, immutability triggers and provenance CHECK.
+- CI `container` job: Docker image build, smoke test (`scripts/container-smoke.sh`) and CycloneDX SBOMs.
+- Docs: WEB_CONNECT, COUNCIL, MEMORY (planned), PROVIDER_POLICY_MATRIX, ADR 0005, v0.3 baseline.
+
+### Changed
+- `PolicyBlocked` error code (`policy_blocked`, 403) added to the error envelope.
+- Navigation adds **Connect**; projects gain a **Councils** tab.
+
 ## [0.2.0] — unreleased (engineering preview)
 
 ### Added

@@ -34,6 +34,15 @@ erDiagram
 | `decision_versions` | yes | JSON snapshot per change with note | **S I** |
 | `provider_requests` | yes | usage metadata: provider, model, mode, outcome, prompt length, tokens, latency — **no prompt or response text** | **S I** |
 | `audit_events` | yes (NULL org for pre-auth events) | actor, type, resource, outcome, correlation ID, small details | **S I** |
+| `role_templates` | yes | custom Web Connect roles (name unique per org) | S I U D |
+| `briefs` | yes | title, mode, classification, current version | S I U |
+| `brief_versions` | yes | immutable brief content (JSON) per version | **S I** |
+| `handoffs` | yes | exact approved instruction, SHA-256, brief version, versioned context list, status prepared/opened/imported | S I U |
+| `responses` | yes | imported or API answers: provider, declared model, source mode, provenance, body, SHA-256, review status | S I U (trigger: only `review_status` may change) |
+| `councils` | yes | title, question, status, decision summary, link to decision record | S I U (trigger: frozen once completed) |
+| `council_responses` | yes | positions; retired rows keep `removed_at` and `replaced_by` | S I U |
+| `council_annotations` | yes | kind, quote, body, author | S I U D |
+| `council_ratings` | yes | 8 criteria × 1–5 per person per response | S I U D |
 
 S/I/U/D = SELECT/INSERT/UPDATE/DELETE for role `quorum_app`.
 
@@ -42,6 +51,9 @@ S/I/U/D = SELECT/INSERT/UPDATE/DELETE for role `quorum_app`.
 * Composite foreign keys `(project_id, organization_id)`, `(document_id, organization_id)`, `(decision_id, organization_id)` and `(superseded_by, organization_id)` make cross-tenant parent/child links impossible.
 * `decisions_protect_content` trigger: content of decisions in `under_review`, `approved`, `rejected` or `superseded` cannot change; `superseded` is final. Applies to every role, including the owner.
 * Checks: role and status enumerations, `superseded ⇔ superseded_by IS NOT NULL`, no self-supersession, `approved_version ≤ current_version`, non-negative counters, digest length 32, audit event type format.
+* `responses_protect_original` trigger: only `review_status` of a response can change. CHECK: `source_mode` `api`/`fixture` ⇔ `provenance = provider_reported`. Unique `(project_id, content_sha256)` prevents duplicate imports.
+* `councils_protect_completed` trigger: councils in `decision_recorded` or `archived` cannot change content or decision link; `archived` is final.
+* `organizations.external_share_limit` (`public`…`restricted`, default `internal`) bounds what may be handed off to external AI.
 * Uniqueness: `users.email_normalized`, `sessions.token_digest`, `invitations.token_digest`, `(organization_id, lower(projects.name))`, `(project_id, decisions.number)`, `(document_id, version)`, `(decision_id, version)`.
 
 ## Concurrency
@@ -56,8 +68,8 @@ UUIDv7 (time-ordered) for all primary keys, generated in Rust (`quorum-domain::i
 
 ## Migrations
 
-sqlx records each migration with a checksum in `_sqlx_migrations`; editing an applied migration fails the next run. Tests apply migrations to a fresh database for every test and re-run them to check idempotence. Upgrade testing across versions starts with the next migration (only one exists).
+sqlx records each migration with a checksum in `_sqlx_migrations`; editing an applied migration fails the next run. Tests apply migrations to a fresh database for every test and re-run them to check idempotence. `0002_web_connect_council.sql` (v0.3) is additive: new tables and one new column with a default; it applies to a v0.2 database without data changes.
 
 ## Planned tables (not created)
 
-`milestones`, `tasks`, `attachments`, `knowledge_records`, `provider_configurations`, `review_records`, `subscriptions`, `entitlements`, `invoices`, `retention_policies`, `organization_policies`. They will be added when their features are built, each with RLS, grants and isolation tests.
+`milestones`, `tasks`, `attachments`, `knowledge_records` (see product/MEMORY.md), `context_packages`, `project_memberships`, `provider_configurations`, `review_records`, `subscriptions`, `entitlements`, `invoices`, `retention_policies`, `organization_policies`. They will be added when their features are built, each with RLS, grants and isolation tests.

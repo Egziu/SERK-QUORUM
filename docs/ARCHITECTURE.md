@@ -37,17 +37,17 @@ flowchart TB
     web[apps/web]
   end
   subgraph app[apps/api — application services]
-    routes[routes/*<br/>auth · orgs · projects · documents · decisions · providers · audit]
+    routes[routes/*<br/>auth · orgs · projects · documents · decisions · providers · connect · council · audit]
     ctx[context<br/>Session extractor · OrgScope · pagination]
     mw[middleware<br/>request id · security headers · limits · timeouts]
   end
   subgraph core[Domain]
-    domain[quorum-domain<br/>ids · roles/permissions · validation · lifecycles]
+    domain[quorum-domain<br/>ids · roles/permissions · validation · lifecycles<br/>connect (briefs, roles, instruction rendering) · council]
   end
   subgraph infra[Infrastructure]
     storage[quorum-storage<br/>repositories · tenant transactions · migrations]
     auth[quorum-auth<br/>Argon2id · tokens]
-    prov[quorum-providers<br/>4 adapters · fixtures]
+    prov[quorum-providers<br/>4 adapters · fixtures · official web destinations]
   end
   web --> routes
   mw --> routes --> ctx
@@ -56,15 +56,15 @@ flowchart TB
   storage --> domain
 ```
 
-| Plane (directive §04) | v0.2 realisation |
+| Plane (directive §04) | v0.3 realisation |
 | --- | --- |
 | Experience | `apps/web` |
 | Identity & access | `quorum-auth`, `context::Session`, `context::OrgScope`, `quorum-domain::access` |
 | Application services | `apps/api/src/routes` |
-| Provider integration | `quorum-providers` |
-| Knowledge & documents | documents + versions (storage, routes); Memory/Vault *planned* |
+| Provider integration | `quorum-providers` (API mode); Web Connect = manual handoff, no provider traffic (ADR 0005) |
+| Knowledge & documents | documents + versions, briefs + versions, handoffs, responses, councils; Memory/Vault *planned* (product/MEMORY.md) |
 | Data protection | RLS, grants, hashing; field encryption *planned* (§7) |
-| Governance & audit | audit events, roles; policies *planned* |
+| Governance & audit | audit events, roles, organization external sharing limit; further policies *planned* |
 | Commercial | usage ledger (`provider_requests`); entitlements/billing *planned* |
 | Observability & operations | `tracing` structured logs, correlation IDs, health endpoints; metrics/OTel *planned* |
 

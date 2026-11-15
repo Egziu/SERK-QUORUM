@@ -1,4 +1,4 @@
-# Threat model (v0.2)
+# Threat model (v0.3)
 
 Method: STRIDE per trust boundary (see ARCHITECTURE §3). Status: **Mitigated** (implemented and tested), **Partial**, **Open**. Reviewed by the implementing engineer only; an independent review is required.
 
@@ -35,10 +35,17 @@ Anonymous internet user; authenticated member of another tenant; insider with a 
 | T19 | Documents | Malicious uploads | no uploads exist yet | N/A (Vault planned with quarantine) |
 | T20 | Input | SQL injection | static parameterized SQL only | Mitigated |
 | T21 | Availability | Large bodies / slow requests | 1 MiB limit, timeouts, bounded provider responses, pagination caps | Partial — no global rate limiting |
-| T22 | Supply chain | Vulnerable dependency | lockfiles, cargo/npm audit in CI, SHA-pinned actions | Partial — no SBOM or signing yet |
+| T22 | Supply chain | Vulnerable dependency | lockfiles, cargo/npm audit in CI, SHA-pinned actions | Partial — CycloneDX SBOMs in CI (v0.3); no signing or provenance attestation yet |
 | T23 | Secrets | Secrets committed to the public repo | `.gitignore`, placeholders only, review | Partial — no automated secret scanning in CI yet |
 | T24 | Backup | Backup disclosure | — | Open — backups not encrypted by QUORUM |
 | T25 | Deployment | Plain HTTP in production | `Secure` cookies and HSTS default on; TLS at proxy | Partial — TLS is operator responsibility |
+| T27 | Web Connect | Confidential material handed to an external AI | server-side classification limit (`policy_blocked`), UI warnings, audit of every handoff with classification | Mitigated for classified briefs; depends on people classifying correctly |
+| T28 | Web Connect | Project data leaking through the provider URL, referrer or opener | fixed official homepages only, no query/fragment, `noopener noreferrer`, `Referrer-Policy: no-referrer` | Mitigated (component + E2E tests) |
+| T29 | Web Connect | Phishing via a tampered destination link | destinations are constants in the provider registry, not data | Mitigated |
+| T30 | Web Connect | Provider credentials or sessions captured | QUORUM never asks for, stores or reads them; no automation of provider sites | Mitigated (by absence of capability) |
+| T31 | Integrity | Imported answer silently edited or misattributed | immutable original (trigger), SHA-256, provenance CHECK, `user_declared` label shown, audit | Mitigated; provider/model of imports remain a declaration |
+| T32 | Integrity | Council outcome changed after the decision | frozen in app and DB trigger; register record follows its own immutability rules | Mitigated |
+| T33 | Injection | Imported answer contains script or instructions | rendered as text; no tools act on it; included in later instructions only if a person selects approved context | Mitigated |
 | T26 | Admin access | Operator reads tenant data with owner role | — | Open — requires separation of duties and break-glass auditing |
 
 ## Release-blocking items for a pilot

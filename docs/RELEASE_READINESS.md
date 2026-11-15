@@ -1,14 +1,14 @@
 # Release readiness matrix
 
-Legend: **Verified** = implemented and covered by automated tests that ran green · **Implemented** = built, limited verification · **Partial** · **Planned** = not built. Updated 2026-11-14 for v0.2.
+Legend: **Verified** = implemented and covered by automated tests that ran green · **Implemented** = built, limited verification · **Partial** · **Planned** = not built. Updated 2026-11-15 for v0.3.
 
 ## First-release acceptance criteria (directive §35)
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| Reproducible local installation | Implemented | `scripts/bootstrap-db.sql`, `scripts/dev.sh`, pinned toolchains/lockfiles; Compose file unverified |
-| Working Rust backend | Verified | 78 Rust tests |
-| Working TypeScript frontend | Verified | typecheck, 12 component tests, E2E |
+| Reproducible local installation | Implemented | `scripts/bootstrap-db.sql`, `scripts/dev.sh`, pinned toolchains/lockfiles; container image smoke-tested in CI (v0.3, pending first CI run); Compose file unverified |
+| Working Rust backend | Verified | 100 Rust tests (v0.3) |
+| Working TypeScript frontend | Verified | typecheck, 18 component tests, E2E (16 page states) |
 | PostgreSQL persistence | Verified | integration tests on PostgreSQL 16 |
 | Organization and user management | Verified | signup, invitations, roles, removal tests |
 | Verified access-control boundaries | Verified | 8-role matrix, isolation (API + SQL + pool), mutation checks |
@@ -37,6 +37,13 @@ Legend: **Verified** = implemented and covered by automated tests that ran green
 | Templates, duplication, PDF/DOCX export, branding | Planned |
 | Decision register | Verified |
 | Command (single provider) | Verified with mocks |
+| Web Connect (bring your own AI, no API key) | Verified (API, component, E2E desktop + mobile) |
+| Classification-based external sharing limit | Verified |
+| Response import with provenance, duplicate detection, immutability | Verified |
+| Council (compare, annotate, rate, record human decision, export) | Verified |
+| Hybrid Council with API responses (`provider_reported`) | Planned (schema ready; Command does not yet save into Council) |
+| Persistent project intelligence (Memory) | Planned — design only (product/MEMORY.md) |
+| Container image build + smoke test + SBOM in CI | Implemented — job added; first CI run is the verification |
 | Live provider verification call ("Verified" status) | Planned |
 | Council (side-by-side comparison) | Planned |
 | Memory (knowledge records, search) | Planned |

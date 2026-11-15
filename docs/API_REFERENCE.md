@@ -60,6 +60,25 @@ The machine-readable contract is [`contracts/openapi.json`](../contracts/openapi
 | `POST /orgs/{org}/provider-runs` | `providers_use` | `mode: fixture | live`; live needs `acknowledge_external_transfer: true` |
 | `GET /orgs/{org}/provider-runs` | `usage_read` | metadata only |
 | `GET /orgs/{org}/audit-events` | `audit_read` | |
+| `GET /orgs/{org}/connect` | `workspace_read` | Web Connect catalog: official websites, API status, roles, classifications, sharing limit |
+| `PUT /orgs/{org}/connect/policy` | `members_manage` | `{external_share_limit}`; audited |
+| `POST /orgs/{org}/roles`, `DELETE …/{role}` | `projects_manage` | custom role templates; names unique per org and distinct from built-ins |
+| `GET`/`POST /orgs/{org}/projects/{project}/briefs` | read / `providers_use` | quick or professional brief; version 1 |
+| `GET`/`PATCH /orgs/{org}/briefs/{brief}` | read / `providers_use` | PATCH appends a version (needs `base_version`) |
+| `POST /orgs/{org}/briefs/{brief}/preview` | `providers_use` | renders instructions for provider/role pairs and selected context; stores nothing |
+| `GET`/`POST /orgs/{org}/briefs/{brief}/handoffs` | read / `providers_use` | records the approved instruction + SHA-256; `403 policy_blocked` above the sharing limit |
+| `POST /orgs/{org}/handoffs/{handoff}/opened` | `providers_use` | records that the person opened the website; proves nothing about their account |
+| `GET`/`POST /orgs/{org}/projects/{project}/responses` | read / `providers_use` | import (`web_import`/`file_import`, user-declared); `409 duplicate_response` with `existing_response_id` |
+| `GET`/`PATCH /orgs/{org}/responses/{response}` | read / `decisions_write` or `decisions_decide` | PATCH changes `review_status` only |
+| `GET`/`POST /orgs/{org}/projects/{project}/councils` | read / `decisions_write` | optional `response_ids` fill positions in order |
+| `GET`/`PATCH /orgs/{org}/councils/{council}` | read / `decisions_write` | detail includes members, retired, annotations, ratings, criteria |
+| `POST /orgs/{org}/councils/{council}/transition` | `decisions_write`; archive needs `decisions_decide` | `{to, base_version}` |
+| `POST /orgs/{org}/councils/{council}/responses`, `DELETE …/responses/{response}` | `decisions_write` | add/replace in a position; removal retires |
+| `POST /orgs/{org}/councils/{council}/annotations`, `DELETE …/annotations/{id}` | `decisions_write` or `decisions_decide` | delete: author only |
+| `PUT /orgs/{org}/councils/{council}/ratings` | `decisions_write` or `decisions_decide` | one score 1–5 per person/criterion/response |
+| `POST /orgs/{org}/councils/{council}/decision` | `decisions_decide` | `{summary, base_version, confirm: true}`; creates a draft register record and freezes the council |
+| `GET /orgs/{org}/councils/{council}/export.md` | `workspace_read` | Markdown with provenance and hashes; audited |
+| `POST /orgs/{org}/councils/{council}/export-document` | `documents_write` | saves the report as an AI-assisted Studio document |
 | `GET /health/live`, `/health/ready` | public | ready checks the database |
 
 ## Compatibility policy

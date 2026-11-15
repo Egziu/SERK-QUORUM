@@ -6,7 +6,7 @@ Written so a customer's privacy reviewer can check each statement. "Implemented"
 
 QUORUM is **not end-to-end encrypted**. The QUORUM server processes document and decision content in plaintext to store, search and export it. When a user sends a brief to an AI provider in live mode, that provider receives and processes the brief in plaintext under the customer's own agreement with that provider.
 
-## Data inventory (v0.2)
+## Data inventory (v0.3)
 
 | Data | Where | Protection today |
 | --- | --- | --- |
@@ -16,6 +16,10 @@ QUORUM is **not end-to-end encrypted**. The QUORUM server processes document and
 | Invitation token | shown once to inviter; `invitations.token_digest` | only digest stored |
 | Projects, documents, versions, decisions | PostgreSQL | Tenant isolation (app + RLS); plaintext at rest unless the operator enables disk/volume encryption |
 | Command briefs and responses | memory of the API process during the request | **Not stored** by QUORUM (only length and token counts) unless the user saves the response as a document |
+| Briefs and their versions | `briefs`, `brief_versions` | Tenant isolation; classification per brief; same at-rest posture as documents |
+| Approved instructions (Web Connect handoffs) | `handoffs` | Exact text + SHA-256 kept as the record of what was shared; tenant isolation |
+| Imported AI answers | `responses` | Stored as pasted, immutable; tenant isolation; labelled user-declared |
+| Council annotations, ratings, decisions | `council_*`, `councils` | Attributed to the person; tenant isolation |
 | Usage metadata | `provider_requests` | provider, model, mode, outcome, prompt length, tokens, latency |
 | Audit events | `audit_events` | event metadata only; no credentials, prompts or document content |
 | Theme preference | browser `localStorage` | non-sensitive |
@@ -24,6 +28,15 @@ QUORUM is **not end-to-end encrypted**. The QUORUM server processes document and
 Secrets, tokens and confidential content are never written to `localStorage`. The CSRF token lives only in memory.
 
 ## External AI providers
+
+### Web Connect (v0.3)
+
+* QUORUM sends nothing to providers in Web Connect. The person copies the instruction and pastes it into the provider website under their own account; what that provider retains is governed by the person's/organization's account terms (see `docs/compliance/PROVIDER_POLICY_MATRIX.md`).
+* Each handoff is refused on the server when the brief's classification exceeds the organization's external sharing limit (default `internal`).
+* Only context the person explicitly selects is included; no project data is ever placed in a URL. Provider sites open with `noopener noreferrer`, and QUORUM sends `Referrer-Policy: no-referrer`.
+* QUORUM never asks for or handles provider passwords, cookies or sessions, and never reads provider conversations.
+
+### API mode (Command)
 
 * Off by default (`QUORUM_PROVIDERS_LIVE=0`). Fixture mode never contacts a provider.
 * Each live request requires the user to tick an explicit consent naming the vendor and model; the server rejects live requests without that flag.

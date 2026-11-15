@@ -4,11 +4,11 @@
 
 **Intelligence. In concert.** A vendor-independent organizational intelligence workspace: projects, versioned documents and a human-owned decision register, with explicit, text-only access to OpenAI, Anthropic, Google Gemini and xAI.
 
-> **Status: v0.2 engineering preview — not production-ready.** The Rust foundation and the first vertical slice (sign-in → organization → project → document → decision record) are implemented and tested. See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) for exactly what is implemented, verified, partial and planned. Do not use with real customer data.
+> **Status: v0.3 engineering preview — not production-ready.** The Rust foundation, the first vertical slice (sign-in → organization → project → document → decision record) and QUORUM Connect with Council (bring your own AI, no API key) are implemented and tested. See [RELEASE_READINESS.md](docs/RELEASE_READINESS.md) for exactly what is implemented, verified, partial and planned. Do not use with real customer data.
 
 ## What works today
 
-| Area | Implemented in v0.2 |
+| Area | Implemented (v0.3) |
 | --- | --- |
 | Identity | Local accounts (Argon2id), server-side sessions (HttpOnly cookie, revocation, expiry), CSRF protection, login throttling |
 | Organizations | Multi-tenant organizations, 8 roles, invitations, role changes, last-owner protection |
@@ -17,10 +17,12 @@
 | Studio documents | 11 categories, append-only version history, optimistic concurrency, approval, Markdown export, AI-assisted labelling |
 | Decision register | Draft → under review → approved / rejected → superseded, frozen content, full history, explicit human confirmation |
 | Command | One provider, one text request; fixture mode (no network) or live with explicit consent; no silent fallback; usage ledger |
+| Web Connect | Bring your own ChatGPT/Claude/Gemini/Grok account, no API key: structured briefs, role instructions, copy, open the official site yourself, paste the answer back (user-declared provenance, duplicates detected, originals immutable); organization classification limit for external sharing. See [WEB_CONNECT.md](docs/product/WEB_CONNECT.md) |
+| Council | Compare responses side by side, annotate, rate on eight criteria, record the human decision into the register, export Markdown or a Studio document. See [COUNCIL.md](docs/product/COUNCIL.md) |
 | Audit | Append-only (for the app role) audit trail of security and business events with correlation IDs |
 | Web client | React + strict TypeScript; light/dark themes; responsive; WCAG 2.2 AA checks with axe-core |
 
-Not yet built: OIDC/SSO, Council, Memory, Vault, Analytics, governance policies, billing, field encryption, PDF/DOCX export. These are tracked in [RELEASE_READINESS.md](docs/RELEASE_READINESS.md), not hidden behind placeholder screens.
+Not yet built: OIDC/SSO, hybrid Council with API answers, Memory, Vault, Analytics, governance policies, billing, field encryption, PDF/DOCX export. These are tracked in [RELEASE_READINESS.md](docs/RELEASE_READINESS.md), not hidden behind placeholder screens.
 
 ## Quick start (local development, synthetic data)
 

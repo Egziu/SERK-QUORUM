@@ -4,18 +4,19 @@ Tests use deterministic synthetic data (`*@example.test`, "Atlas Engineering (sy
 
 ## Suites
 
-| # | Category (directive §30) | Where | Count (v0.2) |
+| # | Category (directive §30) | Where | Count (v0.3) |
 | --- | --- | --- | --- |
-| 1–2 | Unit & domain invariants | `crates/*/src` `#[cfg(test)]`, `apps/api/src` | domain 20, auth 7, providers 12, api 10 |
-| 3 | Database integration | `apps/api/tests/*` (real PostgreSQL, non-owner role) | 21 |
+| 1–2 | Unit & domain invariants | `crates/*/src` `#[cfg(test)]`, `apps/api/src` | domain 29, auth 7, providers 13, api 15 |
+| 3 | Database integration | `apps/api/tests/*` (real PostgreSQL, non-owner role) | 30 (incl. 7 in `web_connect.rs`) |
 | 4 | Migrations | `database::migrations_are_recorded_and_idempotent`; every test migrates a fresh DB | incl. above |
 | 5 | API contract | `apps/api/tests/contract.rs` (spec ↔ route list ↔ router) | 2 |
 | 6 | Authorization | `apps/api/tests/authorization.rs` (all 8 roles × 8 actions) | 4 |
-| 7 | Tenant isolation | `apps/api/tests/tenant_isolation.rs` (API, direct SQL, pool leakage) | 4 |
+| 7 | Tenant isolation | `apps/api/tests/tenant_isolation.rs` (API, direct SQL, pool leakage) | 4 + Connect/Council isolation in `web_connect.rs` |
 | 8 | Cryptography vectors | SHA-256 FIPS 180-2 "abc" vector; Argon2id round-trip (`quorum-auth`) | 2 |
 | 9 | Provider fixtures | `crates/quorum-providers` (recorded-shape JSON + local mock HTTP server) | 18 |
-| 10 | Frontend components | `apps/web/src/**/*.test.ts(x)` (Vitest + Testing Library) | 12 |
-| 11–12 | Browser E2E + accessibility | `apps/web/e2e/run.mjs` (Playwright + axe-core, WCAG 2.0–2.2 A/AA rules) | 1 flow, 12 page states |
+| 10 | Frontend components | `apps/web/src/**/*.test.ts(x)` (Vitest + Testing Library) | 18 |
+| 11–12 | Browser E2E + accessibility | `apps/web/e2e/run.mjs` (Playwright + axe-core, WCAG 2.0–2.2 A/AA rules) | 1 flow incl. Web Connect → Council, 16 page states |
+| — | Container image | `scripts/container-smoke.sh` in CI job `container` (migrate, health, web client, non-root, SIGTERM) + CycloneDX SBOM | CI only (sandbox cannot build the image) |
 | 13 | Backup restoration | manual drill, see BACKUP_AND_RECOVERY.md | not automated |
 | 14 | Billing arithmetic | — | not applicable yet (no billing) |
 | 15 | Performance benchmarks | — | **not yet** |
@@ -44,6 +45,23 @@ npm run e2e        # QUORUM_E2E_URL defaults to http://127.0.0.1:8080
 ```
 
 The run fails on: any failed step, any browser console error, any CSP violation, any HTTP ≥ 400 other than the anonymous session probe, horizontal overflow on a phone viewport, and any *serious* or *critical* axe-core finding. Screenshots go to `apps/web/test-results/screenshots` (CI uploads them as an artifact).
+
+## Evidence from the v0.3 session (2026-11-15)
+
+All commands exited 0. PostgreSQL 16 local, synthetic data only.
+
+| Command | Result |
+| --- | --- |
+| `cargo fmt --all -- --check` | pass |
+| `cargo clippy --workspace --all-targets --locked -- -D warnings` | pass |
+| `cargo test --workspace --locked` | 100 passed, 0 failed, 0 ignored |
+| `npm run typecheck && npm test && npm run build` (apps/web) | 18 passed; build OK |
+| `node e2e/run.mjs` | E2E PASSED; 16 page states, 0 axe violations |
+| `npm run check` (legacy/v0.1-node) | 9 passed |
+| `cargo audit` / `npm audit --audit-level=high` | pass (documented exception RUSTSEC-2026-0459) / 0 vulnerabilities |
+| `scripts/container-smoke.sh` | **not run locally** (no package-mirror access in the sandbox); runs in CI |
+
+The E2E run stubs the four provider homepages at the browser-network layer, so it verifies link targets, `noopener`/`noreferrer` and the absence of query data without contacting any provider.
 
 ## Evidence from the v0.2 session (2026-11-14)
 
