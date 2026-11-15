@@ -93,6 +93,28 @@ impl ProviderId {
         }
     }
 
+    /// Official consumer website for Web Connect. QUORUM only ever opens this
+    /// exact address in a new tab at the user's request; it never puts brief
+    /// content in the URL and never automates the site.
+    pub fn website_url(self) -> &'static str {
+        match self {
+            Self::Openai => "https://chatgpt.com/",
+            Self::Anthropic => "https://claude.ai/",
+            Self::Gemini => "https://gemini.google.com/",
+            Self::Xai => "https://grok.com/",
+        }
+    }
+
+    /// Consumer product name shown on Web Connect cards.
+    pub fn web_product(self) -> &'static str {
+        match self {
+            Self::Openai => "ChatGPT",
+            Self::Anthropic => "Claude",
+            Self::Gemini => "Gemini",
+            Self::Xai => "Grok",
+        }
+    }
+
     /// What QUORUM can state factually about data handling. Vendor retention
     /// and training terms depend on the customer's own agreement and must be
     /// reviewed; QUORUM does not summarize them on the vendor's behalf.
@@ -414,6 +436,24 @@ mod tests {
         }
         assert_eq!(ProviderId::parse("bad"), None);
         assert_eq!(Task::parse("exploit"), None);
+    }
+
+    #[test]
+    fn web_destinations_are_official_https_homepages() {
+        let urls: Vec<_> = ProviderId::ALL.iter().map(|p| p.website_url()).collect();
+        assert_eq!(
+            urls,
+            vec![
+                "https://chatgpt.com/",
+                "https://claude.ai/",
+                "https://gemini.google.com/",
+                "https://grok.com/"
+            ]
+        );
+        assert!(
+            urls.iter().all(|u| !u.contains('?') && !u.contains('#')),
+            "no query strings: nothing can leak via URL"
+        );
     }
 
     #[test]

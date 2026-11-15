@@ -7,6 +7,8 @@
 //! database adds constraints and row-level security as defence in depth.
 
 pub mod access;
+pub mod connect;
+pub mod council;
 pub mod decision;
 pub mod document;
 pub mod error;

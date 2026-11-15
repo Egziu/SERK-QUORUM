@@ -14,6 +14,8 @@
 //! borrows the same pooled connection (verified by integration tests).
 
 pub mod audit;
+pub mod connect;
+pub mod council;
 pub mod decisions;
 pub mod documents;
 pub mod identity;
