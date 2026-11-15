@@ -139,7 +139,7 @@ jobs:
           cargo install cargo-cyclonedx --locked --version 0.5.10
           cargo cyclonedx --format json
           find . -name 'quorum-*.cdx.json' -not -path './sbom/*' -exec mv {} sbom/ \;
-          (cd apps/web && npm sbom --sbom-format cyclonedx --omit dev > ../../sbom/quorum-web.cdx.json)
+          (cd apps/web && npm ci --ignore-scripts --no-audit --no-fund && npm sbom --sbom-format cyclonedx --omit dev > ../../sbom/quorum-web.cdx.json)
           docker image inspect serk-quorum:ci --format '{{.Id}} {{.Config.User}} {{.Size}}' > sbom/image.txt
           ls -l sbom
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
