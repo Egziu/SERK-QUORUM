@@ -59,7 +59,7 @@ All commands exited 0. PostgreSQL 16 local, synthetic data only.
 | `node e2e/run.mjs` | E2E PASSED; 16 page states, 0 axe violations |
 | `npm run check` (legacy/v0.1-node) | 9 passed |
 | `cargo audit` / `npm audit --audit-level=high` | pass (documented exception RUSTSEC-2026-0459) / 0 vulnerabilities |
-| `scripts/container-smoke.sh` | **not run locally** (no package-mirror access in the sandbox); runs in CI |
+| `scripts/container-smoke.sh` | not run locally (no package-mirror access in the sandbox); **passed in CI** run 43680610933 (job `container`, with SBOM) |
 
 The E2E run stubs the four provider homepages at the browser-network layer, so it verifies link targets, `noopener`/`noreferrer` and the absence of query data without contacting any provider.
 

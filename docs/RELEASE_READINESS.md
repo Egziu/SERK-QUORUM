@@ -6,7 +6,7 @@ Legend: **Verified** = implemented and covered by automated tests that ran green
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| Reproducible local installation | Implemented | `scripts/bootstrap-db.sql`, `scripts/dev.sh`, pinned toolchains/lockfiles; container image smoke-tested in CI (v0.3, pending first CI run); Compose file unverified |
+| Reproducible local installation | Implemented | `scripts/bootstrap-db.sql`, `scripts/dev.sh`, pinned toolchains/lockfiles; container image built and smoke-tested in CI (v0.3, run 43680610933); Compose file unverified |
 | Working Rust backend | Verified | 100 Rust tests (v0.3) |
 | Working TypeScript frontend | Verified | typecheck, 18 component tests, E2E (16 page states) |
 | PostgreSQL persistence | Verified | integration tests on PostgreSQL 16 |
@@ -43,7 +43,7 @@ Legend: **Verified** = implemented and covered by automated tests that ran green
 | Council (compare, annotate, rate, record human decision, export) | Verified |
 | Hybrid Council with API responses (`provider_reported`) | Planned (schema ready; Command does not yet save into Council) |
 | Persistent project intelligence (Memory) | Planned — design only (product/MEMORY.md) |
-| Container image build + smoke test + SBOM in CI | Implemented — job added; first CI run is the verification |
+| Container image build + smoke test + SBOM in CI | Verified in CI (run 43680610933: build, migrate, health, web client, non-root, signup off, SIGTERM; CycloneDX SBOM artifact) |
 | Live provider verification call ("Verified" status) | Planned |
 | Council (side-by-side comparison) | Planned |
 | Memory (knowledge records, search) | Planned |

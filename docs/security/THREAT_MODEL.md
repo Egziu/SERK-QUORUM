@@ -35,7 +35,7 @@ Anonymous internet user; authenticated member of another tenant; insider with a 
 | T19 | Documents | Malicious uploads | no uploads exist yet | N/A (Vault planned with quarantine) |
 | T20 | Input | SQL injection | static parameterized SQL only | Mitigated |
 | T21 | Availability | Large bodies / slow requests | 1 MiB limit, timeouts, bounded provider responses, pagination caps | Partial — no global rate limiting |
-| T22 | Supply chain | Vulnerable dependency | lockfiles, cargo/npm audit in CI, SHA-pinned actions | Partial — CycloneDX SBOMs in CI (v0.3); no signing or provenance attestation yet |
+| T22 | Supply chain | Vulnerable dependency | lockfiles, cargo/npm audit in CI, SHA-pinned actions | Partial — CycloneDX SBOMs generated in CI (v0.3); no signing or provenance attestation yet |
 | T23 | Secrets | Secrets committed to the public repo | `.gitignore`, placeholders only, review | Partial — no automated secret scanning in CI yet |
 | T24 | Backup | Backup disclosure | — | Open — backups not encrypted by QUORUM |
 | T25 | Deployment | Plain HTTP in production | `Secure` cookies and HSTS default on; TLS at proxy | Partial — TLS is operator responsibility |
