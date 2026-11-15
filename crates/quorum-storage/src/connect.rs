@@ -317,7 +317,7 @@ pub async fn list_handoffs(
     Ok(sqlx::query_as(
         "SELECT id, project_id, brief_id, brief_version, provider, role_name, mode, instruction, instruction_sha256,
                 context_items, status, opened_at, created_by, created_at
-         FROM handoffs WHERE organization_id = $1 AND brief_id = $2 ORDER BY created_at DESC LIMIT 200",
+         FROM handoffs WHERE organization_id = $1 AND brief_id = $2 ORDER BY created_at, id LIMIT 200",
     )
     .bind(org)
     .bind(brief)

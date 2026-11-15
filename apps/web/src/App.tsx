@@ -4,6 +4,8 @@ import { Loading } from "./components/ui";
 import { AcceptInvitationPage, AuditPage, MembersPage, NewOrganizationPage, ProvidersPage } from "./pages/Admin";
 import { LoginPage, SignupPage } from "./pages/Auth";
 import { CommandPage } from "./pages/Command";
+import { ConnectPage } from "./pages/Connect";
+import { CouncilPage } from "./pages/CouncilPage";
 import { DecisionPage } from "./pages/DecisionPage";
 import { DocumentPage } from "./pages/DocumentPage";
 import { HomePage } from "./pages/Home";
@@ -65,6 +67,8 @@ export function App() {
       >
         <Route index element={<HomePage />} />
         <Route path="command" element={<CommandPage />} />
+        <Route path="connect" element={<ConnectPage />} />
+        <Route path="councils/:council" element={<CouncilPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:project" element={<ProjectDetailPage />} />
         <Route path="documents/:document" element={<DocumentPage />} />

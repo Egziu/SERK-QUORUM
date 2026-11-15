@@ -53,6 +53,17 @@ const STATUS_TONE: Record<string, "ok" | "warn" | "danger" | undefined> = {
   archived: undefined,
   completed: "ok",
   disabled: undefined,
+  awaiting_responses: "warn",
+  ready_for_review: "warn",
+  decision_recorded: "ok",
+  imported: "ok",
+  opened: "warn",
+  prepared: undefined,
+  unreviewed: undefined,
+  public: undefined,
+  internal: undefined,
+  confidential: "warn",
+  restricted: "danger",
 };
 
 export function humanize(s: string): string {

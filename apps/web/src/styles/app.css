@@ -268,6 +268,22 @@ legend { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .auth-brand strong { letter-spacing: 0.22em; font-size: 20px; }
 
 /* ---------- Responsive */
+
+/* ---------------------------------------------------------------- Connect & Council */
+button.list-link { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.list-link[aria-current="true"] { background: var(--accent-soft); }
+details > summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+.council-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); align-items: start; }
+.response-column { min-width: 0; }
+.response-body {
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto;
+  padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel-2);
+}
+.response-body:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+ul:has(> .annotation) { list-style: none; padding: 0; margin: 0; }
+.annotation { border-left: 3px solid var(--line-strong); padding-left: var(--space-2); }
+
 @media (max-width: 1024px) {
   .split { grid-template-columns: 1fr; }
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

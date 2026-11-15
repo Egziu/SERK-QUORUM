@@ -1,4 +1,5 @@
-// Browser acceptance test for the 0.2 vertical slice.
+// Browser acceptance test: the 0.2 vertical slice and the 0.3 Web Connect →
+// Council definition-of-done scenario (no provider API keys anywhere).
 //
 // Prerequisites: the API running with QUORUM_ALLOW_SIGNUP=1 and
 // QUORUM_WEB_DIR pointing at a fresh `npm run build` (see docs/TESTING_GUIDE.md).
@@ -55,6 +56,17 @@ async function shot(page, name) {
 const browser = await chromium.launch();
 try {
   const context = await browser.newContext({ viewport: { width: 1360, height: 900 }, deviceScaleFactor: 2, colorScheme: "light" });
+  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: BASE });
+  // The test never visits a real provider website: requests to the official
+  // destinations are answered by a local stub, so opening one is observable
+  // without any external traffic or automation of a third-party site.
+  const external = [];
+  for (const host of ["chatgpt.com", "claude.ai", "gemini.google.com", "grok.com"]) {
+    await context.route(`https://${host}/**`, (r) => {
+      external.push(r.request().url());
+      return r.fulfill({ status: 200, contentType: "text/html", body: "<!doctype html><title>stub</title>" });
+    });
+  }
   const page = await context.newPage();
   // Browsers log every non-2xx fetch as a console error. HTTP failures are
   // checked precisely below instead; all other console errors fail the run.
@@ -153,6 +165,106 @@ try {
   await audit(page, "command");
   await shot(page, "06-command");
 
+
+  step("Web Connect: structured brief, four roles, approved instructions");
+  await page.getByRole("link", { name: "Connect", exact: true }).click();
+  await page.getByRole("heading", { name: "Bring your own AI" }).waitFor();
+  await page.getByLabel("Project", { exact: true }).selectOption({ label: "Bridge retrofit" });
+  await page.getByRole("button", { name: "New brief" }).click();
+  await page.getByText("Professional", { exact: true }).click();
+  await page.getByLabel("Title", { exact: true }).fill("Bearing supplier selection");
+  await page.getByLabel("Objective", { exact: true }).fill("Recommend an isolation bearing type for the synthetic bridge retrofit.");
+  await page.getByLabel("Current situation", { exact: true }).fill("Two abutments, fictional seismic zone 4.");
+  await page.getByLabel("Evaluation criteria", { exact: true }).fill("Safety margin, cost, maintainability");
+  await page.getByRole("button", { name: "Save brief" }).click();
+  await page.getByRole("heading", { name: "3. Roles and instructions" }).waitFor();
+  for (const [product, role] of [["ChatGPT", "Architect"], ["Claude", "Builder"], ["Gemini", "Scientist"], ["Grok", "Challenger"]]) {
+    const selected = await page.getByLabel(`Role for ${product}`, { exact: true }).evaluate((el) => el.selectedOptions[0].textContent);
+    if (selected !== role) failures.push(`default role for ${product} is ${selected}, expected ${role}`);
+  }
+  await page.getByRole("button", { name: "Prepare instructions" }).click();
+  for (const product of ["ChatGPT", "Claude", "Gemini", "Grok"]) {
+    await page.getByRole("button", { name: `Approve for ${product}` }).click();
+    await page.getByRole("article", { name: new RegExp(`^${product} · `) }).waitFor();
+  }
+  await audit(page, "connect");
+  await shot(page, "11-connect");
+
+  step("Web Connect: copy, open official site (stubbed), import four answers");
+  const products = [["ChatGPT", "https://chatgpt.com/"], ["Claude", "https://claude.ai/"], ["Gemini", "https://gemini.google.com/"], ["Grok", "https://grok.com/"]];
+  for (const [product, url] of products) {
+    const card = page.getByRole("article", { name: new RegExp(`^${product} · `) });
+    await card.getByRole("button", { name: "Copy instruction" }).click();
+    await card.getByText("Instruction copied").waitFor();
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    if (!copied.startsWith("# Role: ")) failures.push(`${product}: clipboard does not hold the instruction`);
+    const link = card.getByRole("link", { name: `Open ${product} ↗` });
+    const href = await link.getAttribute("href");
+    const rel = (await link.getAttribute("rel")) ?? "";
+    if (href !== url || (await link.getAttribute("target")) !== "_blank" || !rel.includes("noopener") || !rel.includes("noreferrer")) {
+      failures.push(`${product}: unsafe or unofficial link ${href} rel=${rel}`);
+    }
+    const [popup] = await Promise.all([page.waitForEvent("popup"), link.click()]);
+    if (popup.url().includes("?") || popup.url() !== url) failures.push(`${product}: popup opened ${popup.url()}`);
+    if (await popup.evaluate(() => window.opener !== null)) failures.push(`${product}: popup can reach window.opener`);
+    await popup.close();
+    await card.getByText("Website opened").waitFor();
+    await card.getByLabel(`Paste the ${product} answer`, { exact: true }).fill(
+      `Synthetic ${product} answer for the bearing study.\nRecommendation: lead-rubber bearings.\nRisk: supplier lead time is assumed, not verified.`,
+    );
+    await card.getByLabel("Model (as you saw it)", { exact: true }).fill("declared-model");
+    await card.getByRole("button", { name: "Import answer" }).click();
+    await card.getByText("Response imported").waitFor();
+  }
+  if (external.some((u) => u.includes("?"))) failures.push(`external URL carried data: ${external.join(", ")}`);
+  await shot(page, "12-connect-imported");
+
+  step("Council: compare, annotate, rate, record the human decision");
+  await page.getByRole("button", { name: "Compare 4 responses" }).click();
+  await page.getByRole("heading", { name: "Bearing supplier selection" }).waitFor();
+  const columns = page.locator(".council-grid > article");
+  if ((await columns.count()) !== 4) failures.push(`council shows ${await columns.count()} responses, expected 4`);
+  await page.getByRole("button", { name: "Start review" }).click();
+  await page.getByText("Under review", { exact: true }).waitFor();
+  const first = columns.first();
+  await first.getByText(/^Ratings/).click();
+  await first.getByLabel("Evidence quality", { exact: true }).selectOption("4");
+  await page.locator(".council-grid > article").first().getByText("Ratings (1)").waitFor();
+  const challenger = page.getByRole("article", { name: /Challenger/ });
+  await challenger.getByLabel("Kind", { exact: true }).selectOption("risk");
+  await challenger.getByLabel("Annotation", { exact: true }).fill("Lead time is an unverified assumption.");
+  await challenger.getByRole("button", { name: "Add" }).click();
+  await challenger.getByText("Lead time is an unverified assumption.").waitFor();
+  await audit(page, "council");
+  await shot(page, "13-council");
+  await page.getByRole("textbox", { name: "Decision", exact: true }).fill("Use lead-rubber bearings; verify supplier lead time before ordering.");
+  await page.getByLabel(/I reviewed the responses/).check();
+  await page.getByRole("button", { name: "Record decision" }).click();
+  await page.getByText("This council is completed and frozen").waitFor();
+  await shot(page, "14-council-decided");
+
+  step("Council: export Markdown and save the report as a document");
+  const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Export Markdown" }).click()]);
+  const md = readFileSync(await download.path(), "utf8");
+  for (const needle of ["# Council: Bearing supplier selection", "user_declared", "lead-rubber bearings", "evidence_quality: 4"]) {
+    if (!md.includes(needle)) failures.push(`markdown export lacks "${needle}"`);
+  }
+  await page.getByRole("button", { name: "Save as document" }).click();
+  await page.getByRole("heading", { name: "Council report: Bearing supplier selection" }).waitFor();
+  await audit(page, "council-document");
+  await page.goBack();
+
+  step("decision from Council is approved by a human in the register");
+  await page.getByRole("link", { name: "DEC-0002" }).click();
+  await page.getByRole("heading", { name: /DEC-0002/ }).waitFor();
+  await page.getByRole("button", { name: "Submit for review" }).click();
+  await page.getByText("Content is frozen while under review").waitFor();
+  await page.getByLabel(/I confirm this is a human decision/).check();
+  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByText("This record is final").waitFor();
+  await shot(page, "15-council-decision-approved");
+  const councilUrl = page.url();
+
   step("home summary reflects real records");
   await page.getByRole("link", { name: "Home", exact: true }).click();
   await page.getByText("Documents").first().waitFor();
@@ -195,6 +307,16 @@ try {
   await m.getByRole("navigation", { name: "Workspace" }).getByRole("link", { name: "Command", exact: true }).waitFor();
   await audit(m, "mobile-menu");
   await shot(m, "10-mobile-menu");
+  await m.goto(`${BASE}/o/${new URL(councilUrl).pathname.split("/")[2]}/projects`);
+  await m.getByRole("link", { name: /Bridge retrofit/ }).click();
+  await m.getByRole("tab", { name: "Councils" }).click();
+  await m.getByRole("link", { name: /Bearing supplier selection/ }).click();
+  await m.getByRole("tablist", { name: "Responses" }).waitFor();
+  await m.getByRole("tab", { name: /Challenger/ }).click();
+  await m.getByText("Lead time is an unverified assumption.").waitFor();
+  if (await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) failures.push("mobile council: horizontal overflow");
+  await audit(m, "mobile-council");
+  await shot(m, "16-mobile-council");
   await mobile.close();
 
   step("sign out ends the session");

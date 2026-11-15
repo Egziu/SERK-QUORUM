@@ -190,7 +190,10 @@ async fn web_connect_works_without_any_api_credentials() {
     let r = c
         .get(&format!("/api/v1/orgs/{org}/briefs/{brief_id}/handoffs"))
         .await;
-    assert_eq!(r.body[0]["status"], "imported");
+    assert_eq!(
+        r.body[0]["status"], "imported",
+        "handoffs are listed in creation order"
+    );
 
     // The same text again (with different line endings) is a duplicate.
     let r = c

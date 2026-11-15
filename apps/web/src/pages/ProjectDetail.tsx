@@ -3,6 +3,7 @@ import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 
 import { ApiError, api, errorMessage } from "../api/client";
 import {
   DOCUMENT_CATEGORIES,
+  type CouncilSummary,
   type Decision,
   type DocumentCategory,
   type DocumentDetail,
@@ -16,7 +17,7 @@ import { Empty, ErrorNotice, Field, Loading, StatusBadge, TableWrap } from "../c
 import { formatDate, useLoad } from "../hooks";
 import { can } from "../session";
 
-type Tab = "documents" | "decisions" | "settings";
+type Tab = "documents" | "decisions" | "councils" | "settings";
 
 export function ProjectDetailPage() {
   const m = useOutletContext<Membership>();
@@ -33,6 +34,7 @@ export function ProjectDetailPage() {
   const tabs: [Tab, string][] = [
     ["documents", `Documents (${p.document_count})`],
     ["decisions", `Decisions (${p.decision_count})`],
+    ["councils", "Councils"],
     ...(can(m, "projects_manage") ? ([["settings", "Settings"]] as [Tab, string][]) : []),
   ];
 
@@ -89,6 +91,7 @@ export function ProjectDetailPage() {
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "documents" && <Documents m={m} project={p} onChange={project.reload} />}
         {tab === "decisions" && <Decisions m={m} project={p} onChange={project.reload} />}
+        {tab === "councils" && <Councils m={m} project={p} />}
         {tab === "settings" && <Settings org={org} project={p} onSaved={project.reload} />}
       </div>
     </>
@@ -342,6 +345,52 @@ function Settings({ org, project, onSaved }: { org: string; project: Project; on
           </button>
         </div>
       </form>
+    </section>
+  );
+}
+
+function Councils({ m, project }: { m: Membership; project: Project }) {
+  const org = m.organization_id;
+  const list = useLoad(
+    (s) => api.get<Paged<CouncilSummary>>(`/orgs/${org}/projects/${project.id}/councils?limit=100`, s),
+    [org, project.id],
+  );
+  return (
+    <section className="card stack">
+      <div className="row-between">
+        <h2>Councils</h2>
+        {can(m, "providers_use") && project.status !== "archived" && (
+          <Link className="btn primary" to={`../../connect?project=${project.id}`} relative="path">
+            Consult AI with Connect
+          </Link>
+        )}
+      </div>
+      {list.loading ? (
+        <Loading />
+      ) : list.error ? (
+        <ErrorNotice message={list.error} onRetry={list.reload} />
+      ) : list.data?.items.length === 0 ? (
+        <Empty title="No councils yet">
+          <span>Prepare a brief in Connect, import the answers, then compare them here.</span>
+        </Empty>
+      ) : (
+        <ul className="list">
+          {list.data?.items.map((c) => (
+            <li key={c.id}>
+              <Link className="list-link" to={`../../councils/${c.id}`} relative="path">
+                <span>
+                  <span className="title">{c.title}</span>
+                  <br />
+                  <span className="small muted">
+                    {c.response_count} responses · updated {formatDate(c.updated_at)}
+                  </span>
+                </span>
+                <StatusBadge status={c.status} />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

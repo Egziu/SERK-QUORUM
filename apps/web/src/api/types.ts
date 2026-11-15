@@ -240,3 +240,221 @@ export interface AuditEvent {
   details: Record<string, unknown>;
   occurred_at: string;
 }
+
+// ---------------------------------------------------------------- QUORUM Connect
+
+export type Classification = "public" | "internal" | "confidential" | "restricted";
+export const CLASSIFICATION_LABELS: Record<Classification, string> = {
+  public: "Public",
+  internal: "Internal",
+  confidential: "Confidential",
+  restricted: "Restricted",
+};
+export type BriefMode = "quick" | "professional";
+
+export interface ConnectProvider {
+  id: ProviderId;
+  vendor: string;
+  web_product: string;
+  website_url: string;
+  web_status: "available";
+  api_status: ProviderStatus;
+  api_model: string | null;
+  data_handling: string;
+}
+
+export interface RoleTemplate {
+  key: string;
+  name: string;
+  focus: string;
+  guidance: string;
+  built_in: boolean;
+  suggested_provider: ProviderId | null;
+}
+
+export interface ConnectCatalog {
+  providers: ConnectProvider[];
+  roles: RoleTemplate[];
+  classifications: Classification[];
+  external_share_limit: Classification;
+  notice: string;
+}
+
+export interface BriefContent {
+  request: string;
+  current_situation: string;
+  desired_outcome: string;
+  background: string;
+  constraints: string;
+  requirements: string;
+  deliverable_format: string;
+  evaluation_criteria: string;
+  open_questions: string;
+  language: string;
+  audience: string;
+}
+
+export const EMPTY_BRIEF: BriefContent = {
+  request: "",
+  current_situation: "",
+  desired_outcome: "",
+  background: "",
+  constraints: "",
+  requirements: "",
+  deliverable_format: "",
+  evaluation_criteria: "",
+  open_questions: "",
+  language: "",
+  audience: "",
+};
+
+export interface Brief {
+  id: string;
+  project_id: string;
+  title: string;
+  mode: BriefMode;
+  classification: Classification;
+  version: number;
+  content: Partial<BriefContent>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PreparedInstruction {
+  provider: ProviderId;
+  role: string;
+  role_name: string;
+  instruction: string;
+  characters: number;
+  estimated_tokens: number;
+  sha256: string;
+}
+
+export interface ContextItemView {
+  kind: "document" | "decision";
+  id: string;
+  version: number;
+  title: string;
+  characters: number;
+}
+
+export interface Preview {
+  brief_version: number;
+  classification: Classification;
+  external_share_limit: Classification;
+  sharing_allowed: boolean;
+  context_items: ContextItemView[];
+  instructions: PreparedInstruction[];
+}
+
+export type HandoffStatus = "prepared" | "opened" | "imported";
+
+export interface Handoff {
+  id: string;
+  brief_id: string;
+  brief_version: number;
+  provider: ProviderId;
+  role_name: string;
+  mode: "web" | "api";
+  instruction: string;
+  instruction_sha256: string;
+  context_items: { kind: string; id: string; version: number; title: string }[];
+  status: HandoffStatus;
+  website_url: string | null;
+  opened_at: string | null;
+  created_at: string;
+}
+
+export type ReviewStatus = "unreviewed" | "accepted" | "rejected";
+
+export interface AiResponse {
+  id: string;
+  project_id: string;
+  handoff_id: string | null;
+  brief_id: string | null;
+  brief_version: number | null;
+  provider: ProviderId | "other";
+  model: string;
+  role_name: string | null;
+  source_mode: "web_import" | "file_import" | "api" | "fixture";
+  provenance: "user_declared" | "provider_reported";
+  provenance_label: string;
+  body: string;
+  characters: number;
+  content_sha256: string;
+  reference_url: string;
+  review_status: ReviewStatus;
+  imported_by_name: string;
+  imported_at: string;
+}
+
+// ---------------------------------------------------------------- Council
+
+export type CouncilStatus =
+  | "draft"
+  | "awaiting_responses"
+  | "ready_for_review"
+  | "under_review"
+  | "decision_recorded"
+  | "archived";
+
+export type AnnotationKind =
+  | "note"
+  | "highlight"
+  | "evidence"
+  | "assumption"
+  | "contradiction"
+  | "alternative"
+  | "question"
+  | "risk";
+export const ANNOTATION_KINDS: AnnotationKind[] = [
+  "note",
+  "highlight",
+  "evidence",
+  "assumption",
+  "contradiction",
+  "alternative",
+  "question",
+  "risk",
+];
+
+export interface CouncilSummary {
+  id: string;
+  project_id: string;
+  title: string;
+  question: string;
+  status: CouncilStatus;
+  response_count: number;
+  decision_id: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CouncilDetail extends CouncilSummary {
+  decision_summary: string;
+  decision: { id: string; reference: string; status: DecisionStatus } | null;
+  members: { position: number; response: AiResponse; added_at: string }[];
+  retired: { position: number; response_id: string; replaced_by: string | null; removed_at: string | null }[];
+  annotations: {
+    id: string;
+    response_id: string | null;
+    kind: AnnotationKind;
+    quote: string;
+    body: string;
+    author_id: string;
+    author_name: string;
+    created_at: string;
+  }[];
+  ratings: {
+    response_id: string;
+    criterion: string;
+    score: number;
+    reason: string;
+    rated_by: string;
+    rated_by_name: string;
+  }[];
+  criteria: { key: string; label: string }[];
+  can_edit: boolean;
+  can_decide: boolean;
+}

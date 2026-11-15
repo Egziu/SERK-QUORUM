@@ -8,6 +8,8 @@ export class ApiError extends Error {
     message: string,
     readonly field?: string,
     readonly correlationId?: string,
+    /** The full error object, for endpoints that add details (e.g. duplicates). */
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -30,7 +32,7 @@ export function setUnauthenticatedHandler(handler: (() => void) | null): void {
 }
 
 interface ErrorEnvelope {
-  error?: { code?: string; message?: string; field?: string; correlation_id?: string };
+  error?: { code?: string; message?: string; field?: string; correlation_id?: string } & Record<string, unknown>;
 }
 
 async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
@@ -62,6 +64,7 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
       err?.message ?? `Request failed (${res.status}).`,
       err?.field,
       err?.correlation_id,
+      err ?? undefined,
     );
   }
   return data as T;
@@ -79,6 +82,7 @@ export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>("GET", path, undefined, signal),
   post: <T>(path: string, body: unknown = {}, signal?: AbortSignal) => request<T>("POST", path, body, signal),
   patch: <T>(path: string, body: unknown) => request<T>("PATCH", path, body),
+  put: <T>(path: string, body: unknown) => request<T>("PUT", path, body),
   delete: <T>(path: string) => request<T>("DELETE", path),
 };
 

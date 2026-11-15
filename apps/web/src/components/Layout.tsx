@@ -64,6 +64,7 @@ export function Layout() {
           <NavLink to={base} end>
             Home
           </NavLink>
+          {can(membership, "providers_use") && <NavLink to={`${base}/connect`}>Connect</NavLink>}
           {can(membership, "providers_use") && <NavLink to={`${base}/command`}>Command</NavLink>}
           <NavLink to={`${base}/projects`}>Projects</NavLink>
         </nav>
@@ -77,7 +78,7 @@ export function Layout() {
 
         <div className="sidebar-footer">
           <span>Intelligence. In concert.</span>
-          <span className="small">v0.2 · engineering preview</span>
+          <span className="small">v0.3 · engineering preview</span>
         </div>
       </aside>
 
