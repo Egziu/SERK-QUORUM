@@ -62,6 +62,10 @@ echo "• graceful shutdown on SIGTERM"
 docker stop -t 20 "$APP" >/dev/null
 exit_code="$(docker inspect -f '{{.State.ExitCode}}' "$APP")"
 [[ "$exit_code" == "0" ]] || fail "exit code $exit_code after SIGTERM"
-docker logs "$APP" 2>&1 | grep -q "shutdown signal received" || fail "no graceful shutdown log"
+# Capture first: with pipefail, `docker logs | grep -q` can fail when grep exits
+# early and docker logs gets SIGPIPE.
+logs="$(docker logs "$APP" 2>&1)"
+grep -q "shutdown signal received" <<<"$logs" || fail "no graceful shutdown log"
+grep -q "shut down cleanly" <<<"$logs" || fail "shutdown did not complete cleanly"
 
 echo "CONTAINER SMOKE PASSED"
