@@ -19,10 +19,15 @@ use serde::Serialize;
 #[derive(Debug)]
 pub enum ApiError {
     BadRequest(String),
-    Validation { field: String, message: String },
+    Validation {
+        field: String,
+        message: String,
+    },
     Unauthenticated,
     Csrf,
     Forbidden,
+    /// Refused by an organization policy (for example, external sharing limits).
+    PolicyBlocked(String),
     NotFound(&'static str),
     Conflict(String),
     RateLimited(&'static str),
@@ -75,6 +80,7 @@ impl ApiError {
                 "Your role does not permit this action.".into(),
                 None,
             ),
+            PolicyBlocked(m) => (StatusCode::FORBIDDEN, "policy_blocked", m, None),
             NotFound(what) => (
                 StatusCode::NOT_FOUND,
                 "not_found",

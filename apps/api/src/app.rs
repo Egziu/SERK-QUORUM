@@ -1,11 +1,13 @@
 //! Router and middleware stack.
 
-use crate::routes::{audit, auth, decisions, documents, health, orgs, projects, providers};
+use crate::routes::{
+    audit, auth, connect, council, decisions, documents, health, orgs, projects, providers,
+};
 use crate::state::AppState;
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use axum::http::{HeaderName, HeaderValue, StatusCode, header};
-use axum::routing::{get, post};
+use axum::routing::{delete, get, patch, post, put};
 use std::time::Duration;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -59,6 +61,44 @@ pub const ROUTES: &[(&str, &str)] = &[
     ("GET", "/api/v1/orgs/{org}/provider-runs"),
     ("POST", "/api/v1/orgs/{org}/provider-runs"),
     ("GET", "/api/v1/orgs/{org}/audit-events"),
+    ("GET", "/api/v1/orgs/{org}/connect"),
+    ("PUT", "/api/v1/orgs/{org}/connect/policy"),
+    ("POST", "/api/v1/orgs/{org}/roles"),
+    ("DELETE", "/api/v1/orgs/{org}/roles/{role}"),
+    ("GET", "/api/v1/orgs/{org}/projects/{project}/briefs"),
+    ("POST", "/api/v1/orgs/{org}/projects/{project}/briefs"),
+    ("GET", "/api/v1/orgs/{org}/briefs/{brief}"),
+    ("PATCH", "/api/v1/orgs/{org}/briefs/{brief}"),
+    ("POST", "/api/v1/orgs/{org}/briefs/{brief}/preview"),
+    ("GET", "/api/v1/orgs/{org}/briefs/{brief}/handoffs"),
+    ("POST", "/api/v1/orgs/{org}/briefs/{brief}/handoffs"),
+    ("POST", "/api/v1/orgs/{org}/handoffs/{handoff}/opened"),
+    ("GET", "/api/v1/orgs/{org}/projects/{project}/responses"),
+    ("POST", "/api/v1/orgs/{org}/projects/{project}/responses"),
+    ("GET", "/api/v1/orgs/{org}/responses/{response}"),
+    ("PATCH", "/api/v1/orgs/{org}/responses/{response}"),
+    ("GET", "/api/v1/orgs/{org}/projects/{project}/councils"),
+    ("POST", "/api/v1/orgs/{org}/projects/{project}/councils"),
+    ("GET", "/api/v1/orgs/{org}/councils/{council}"),
+    ("PATCH", "/api/v1/orgs/{org}/councils/{council}"),
+    ("POST", "/api/v1/orgs/{org}/councils/{council}/transition"),
+    ("POST", "/api/v1/orgs/{org}/councils/{council}/responses"),
+    (
+        "DELETE",
+        "/api/v1/orgs/{org}/councils/{council}/responses/{response}",
+    ),
+    ("POST", "/api/v1/orgs/{org}/councils/{council}/annotations"),
+    (
+        "DELETE",
+        "/api/v1/orgs/{org}/councils/{council}/annotations/{annotation}",
+    ),
+    ("PUT", "/api/v1/orgs/{org}/councils/{council}/ratings"),
+    ("POST", "/api/v1/orgs/{org}/councils/{council}/decision"),
+    ("GET", "/api/v1/orgs/{org}/councils/{council}/export.md"),
+    (
+        "POST",
+        "/api/v1/orgs/{org}/councils/{council}/export-document",
+    ),
 ];
 
 fn api() -> Router<AppState> {
@@ -73,7 +113,7 @@ fn api() -> Router<AppState> {
         .route("/orgs/{org}/members", get(orgs::members))
         .route(
             "/orgs/{org}/members/{user}",
-            axum::routing::patch(orgs::change_role).delete(orgs::remove_member),
+            patch(orgs::change_role).delete(orgs::remove_member),
         )
         .route(
             "/orgs/{org}/invitations",
@@ -81,7 +121,7 @@ fn api() -> Router<AppState> {
         )
         .route(
             "/orgs/{org}/invitations/{invitation}",
-            axum::routing::delete(orgs::revoke_invitation),
+            delete(orgs::revoke_invitation),
         )
         .route("/invitations/accept", post(orgs::accept))
         .route(
@@ -135,6 +175,76 @@ fn api() -> Router<AppState> {
             get(providers::usage_list).post(providers::run),
         )
         .route("/orgs/{org}/audit-events", get(audit::list))
+        .route("/orgs/{org}/connect", get(connect::catalog))
+        .route("/orgs/{org}/connect/policy", put(connect::set_policy))
+        .route("/orgs/{org}/roles", post(connect::create_role))
+        .route("/orgs/{org}/roles/{role}", delete(connect::delete_role))
+        .route(
+            "/orgs/{org}/projects/{project}/briefs",
+            get(connect::list_briefs).post(connect::create_brief),
+        )
+        .route(
+            "/orgs/{org}/briefs/{brief}",
+            get(connect::get_brief).patch(connect::update_brief),
+        )
+        .route("/orgs/{org}/briefs/{brief}/preview", post(connect::preview))
+        .route(
+            "/orgs/{org}/briefs/{brief}/handoffs",
+            get(connect::list_handoffs).post(connect::create_handoff),
+        )
+        .route(
+            "/orgs/{org}/handoffs/{handoff}/opened",
+            post(connect::mark_opened),
+        )
+        .route(
+            "/orgs/{org}/projects/{project}/responses",
+            get(connect::list_responses).post(connect::import_response),
+        )
+        .route(
+            "/orgs/{org}/responses/{response}",
+            get(connect::get_response).patch(connect::review_response),
+        )
+        .route(
+            "/orgs/{org}/projects/{project}/councils",
+            get(council::list).post(council::create),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}",
+            get(council::get).patch(council::update),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/transition",
+            post(council::transition),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/responses",
+            post(council::add_response),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/responses/{response}",
+            delete(council::remove_response),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/annotations",
+            post(council::annotate),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/annotations/{annotation}",
+            delete(council::delete_annotation),
+        )
+        .route("/orgs/{org}/councils/{council}/ratings", put(council::rate))
+        .route(
+            "/orgs/{org}/councils/{council}/decision",
+            post(council::record_decision),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/export.md",
+            get(council::export_markdown),
+        )
+        .route(
+            "/orgs/{org}/councils/{council}/export-document",
+            post(council::export_document),
+        )
         .fallback(|| async { crate::error::ApiError::NotFound("Endpoint") })
         .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,

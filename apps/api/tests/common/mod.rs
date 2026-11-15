@@ -205,6 +205,9 @@ impl Client {
     pub async fn patch(&mut self, path: &str, body: Value) -> Response {
         self.request(Method::PATCH, path, Some(body)).await
     }
+    pub async fn put(&mut self, path: &str, body: Value) -> Response {
+        self.request(Method::PUT, path, Some(body)).await
+    }
     pub async fn delete(&mut self, path: &str) -> Response {
         self.request(Method::DELETE, path, None).await
     }

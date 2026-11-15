@@ -1,5 +1,7 @@
 pub mod audit;
 pub mod auth;
+pub mod connect;
+pub mod council;
 pub mod decisions;
 pub mod documents;
 pub mod health;
