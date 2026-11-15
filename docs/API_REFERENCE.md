@@ -59,6 +59,7 @@ The machine-readable contract is [`contracts/openapi.json`](../contracts/openapi
 | `GET /orgs/{org}/providers` | `workspace_read` | status: `disabled` / `not_configured` / `configured` (never "verified") |
 | `POST /orgs/{org}/provider-runs` | `providers_use` | `mode: fixture | live`; live needs `acknowledge_external_transfer: true` |
 | `GET /orgs/{org}/provider-runs` | `usage_read` | metadata only |
+| `POST /orgs/{org}/provider-checks` | `members_manage` | `{provider}`; one fixed "reply OK" request (≤ 16 output tokens, no customer data) to test the server's key and model. Outcome `working`, `live_disabled`, `not_configured`, `key_rejected`, `model_or_endpoint_not_found`, `request_rejected`, `rate_limited`, `provider_error`, `timeout` or `unreachable`, with advice. Throttled per provider; audited. The latest result appears as `last_check` in `GET /providers` (kept in memory, reset on restart) |
 | `GET /orgs/{org}/audit-events` | `audit_read` | |
 | `GET /orgs/{org}/connect` | `workspace_read` | Web Connect catalog: official websites, API status, roles, classifications, sharing limit |
 | `PUT /orgs/{org}/connect/policy` | `members_manage` | `{external_share_limit}`; audited |

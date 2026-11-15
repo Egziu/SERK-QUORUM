@@ -60,6 +60,7 @@ pub const ROUTES: &[(&str, &str)] = &[
     ("GET", "/api/v1/orgs/{org}/providers"),
     ("GET", "/api/v1/orgs/{org}/provider-runs"),
     ("POST", "/api/v1/orgs/{org}/provider-runs"),
+    ("POST", "/api/v1/orgs/{org}/provider-checks"),
     ("GET", "/api/v1/orgs/{org}/audit-events"),
     ("GET", "/api/v1/orgs/{org}/connect"),
     ("PUT", "/api/v1/orgs/{org}/connect/policy"),
@@ -174,6 +175,7 @@ fn api() -> Router<AppState> {
             "/orgs/{org}/provider-runs",
             get(providers::usage_list).post(providers::run),
         )
+        .route("/orgs/{org}/provider-checks", post(providers::check))
         .route("/orgs/{org}/audit-events", get(audit::list))
         .route("/orgs/{org}/connect", get(connect::catalog))
         .route("/orgs/{org}/connect/policy", put(connect::set_policy))

@@ -44,3 +44,26 @@ The image runs as UID 10001, serves the SPA from `/app/web`, logs JSON, and expo
 ## Graceful shutdown
 
 The API stops accepting connections on SIGTERM/SIGINT and drains in-flight requests. Allow at least the provider timeout + 15 s (default 60 s) before forcing termination.
+
+## Connecting AI providers (API mode) and testing them
+
+Web Connect needs no configuration. For API mode:
+
+1. Create an API key in the provider's developer console and choose an exact model identifier from its model list.
+2. Set the server variables (on Railway: service → *Variables*), then let the service restart:
+
+   | Variable | Example value |
+   | --- | --- |
+   | `QUORUM_PROVIDERS_LIVE` | `1` (master switch; `0` = fixtures only) |
+   | `OPENAI_API_KEY`, `OPENAI_MODEL` | key, model id |
+   | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | key, model id |
+   | `GEMINI_API_KEY`, `GEMINI_MODEL` | key, model id |
+   | `XAI_API_KEY`, `XAI_MODEL` | key, model id |
+   | `QUORUM_PROVIDER_MAX_OUTPUT_TOKENS` | `1200` (default) |
+   | `QUORUM_PROVIDER_TIMEOUT_SECONDS` | `45` (default) |
+
+   A provider needs both its key and its model; otherwise it shows *Not configured*.
+3. Sign in as an owner or administrator, open **Providers & usage** and press **Test** for each provider. *Working* means the provider accepted the key and model for one tiny fixed request (≤ 16 output tokens, no customer data). Any other result names the cause (key rejected, model not found, rate limited / no quota, provider error, timeout, unreachable) and what to change. Results are audited and reset when the server restarts.
+4. Use **Command** in *Live* mode for a real request; each one asks for explicit consent and is recorded in the usage ledger.
+
+Enabling live mode sends text to external providers under your organization's agreements with them; review `docs/compliance/PROVIDER_POLICY_MATRIX.md` first.

@@ -44,7 +44,7 @@ Legend: **Verified** = implemented and covered by automated tests that ran green
 | Hybrid Council with API responses (`provider_reported`) | Planned (schema ready; Command does not yet save into Council) |
 | Persistent project intelligence (Memory) | Planned — design only (product/MEMORY.md) |
 | Container image build + smoke test + SBOM in CI | Verified in CI (run 43680610933: build, migrate, health, web client, non-root, signup off, SIGTERM; CycloneDX SBOM artifact) |
-| Live provider verification call ("Verified" status) | Planned |
+| Live provider connection check (Test button, per provider) | Verified against a local mock provider (API + component tests); not yet run against real vendor accounts |
 | Council (side-by-side comparison) | Planned |
 | Memory (knowledge records, search) | Planned |
 | Vault (attachments) | Planned |

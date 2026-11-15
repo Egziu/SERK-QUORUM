@@ -3,7 +3,7 @@
 use super::{ApiJson, ApiPath, ApiQuery, ts};
 use crate::context::{OrgScope, Page, Paged, Session};
 use crate::error::{ApiError, ApiResult};
-use crate::state::AppState;
+use crate::state::{AppState, LastCheck};
 use axum::Json;
 use axum::extract::State;
 use quorum_domain::Permission;
@@ -28,6 +28,8 @@ pub struct ProviderView {
     pub capabilities: [&'static str; 1],
     pub data_handling: &'static str,
     pub fixture_available: bool,
+    /// Result of the most recent connection check since the server started.
+    pub last_check: Option<LastCheck>,
 }
 
 #[derive(Serialize)]
@@ -67,6 +69,7 @@ pub async fn catalog(
                 capabilities: ["text"],
                 data_handling: p.data_handling(),
                 fixture_available: true,
+                last_check: state.last_check(p),
             })
             .collect(),
         tasks: Task::ALL
@@ -289,4 +292,72 @@ pub async fn usage_list(
         limit,
         offset,
     )))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CheckRequest {
+    pub provider: ProviderId,
+}
+
+/// POST /api/v1/orgs/{org}/provider-checks — sends one minimal fixed request
+/// ("reply OK", ≤ 16 output tokens, no customer data) to verify that the
+/// server's key and model for this provider are accepted. Owners and
+/// administrators only; throttled; audited.
+pub async fn check(
+    State(state): State<AppState>,
+    session: Session,
+    ApiPath(org): ApiPath<Uuid>,
+    ApiJson(req): ApiJson<CheckRequest>,
+) -> ApiResult<Json<LastCheck>> {
+    let checked_by = {
+        let mut scope = OrgScope::open(&state, &session, org, Permission::MembersManage).await?;
+        let name = quorum_storage::identity::get_user(&mut scope.tx, scope.user.as_uuid())
+            .await?
+            .map(|u| u.display_name)
+            .unwrap_or_default();
+        scope.commit().await?;
+        name
+    };
+    let throttle_key = format!("provider-check:{}", req.provider.as_str());
+    let settings = &state.config().providers;
+    let contacts_provider = settings.status(req.provider) == ProviderStatus::Configured;
+    if contacts_provider {
+        if state.inner.provider_throttle.is_limited(&throttle_key) {
+            return Err(ApiError::RateLimited(
+                "This provider was just checked. Wait a few seconds.",
+            ));
+        }
+        state.inner.provider_throttle.hit(&throttle_key);
+    }
+    let report = {
+        let Ok(_permit) = state.inner.provider_slots.try_acquire() else {
+            return Err(ApiError::RateLimited(
+                "The server is handling other live requests. Try again shortly.",
+            ));
+        };
+        quorum_providers::check_connection(&state.inner.http, settings, req.provider).await
+    };
+    let last = LastCheck {
+        advice: report.outcome.advice(),
+        report,
+        checked_at: OffsetDateTime::now_utc(),
+        checked_by,
+    };
+    if let Ok(mut m) = state.inner.provider_checks.lock() {
+        m.insert(req.provider, last.clone());
+    }
+    let mut scope = OrgScope::open(&state, &session, org, Permission::MembersManage).await?;
+    scope
+        .audit(
+            "provider.connection_checked",
+            "provider",
+            Uuid::nil(),
+            json!({ "provider": req.provider, "model": last.report.model, "outcome": last.report.outcome,
+                    "http_status": last.report.http_status, "latency_ms": last.report.latency_ms,
+                    "contacted_provider": contacts_provider }),
+        )
+        .await?;
+    scope.commit().await?;
+    Ok(Json(last))
 }

@@ -124,3 +124,65 @@ async fn unreachable_provider_is_network_error() {
         Some(ProviderError::Network | ProviderError::Timeout)
     ));
 }
+
+#[tokio::test]
+async fn connection_check_reports_working_and_sends_only_the_fixed_prompt() {
+    let app = Router::new().route(
+        "/v1/messages",
+        post(|headers: HeaderMap, body: String| async move {
+            assert_eq!(headers["x-api-key"], "mock-key");
+            assert!(body.contains(CHECK_PROMPT));
+            assert!(body.contains("\"max_tokens\":16"), "{body}");
+            include_str!("../fixtures/anthropic_messages.json")
+        }),
+    );
+    let s = settings(ProviderId::Anthropic, spawn(app).await, 5_000);
+    let r = check_connection(&reqwest::Client::new(), &s, ProviderId::Anthropic).await;
+    assert_eq!(r.outcome, CheckOutcome::Working);
+    assert_eq!(r.http_status, Some(200));
+    assert_eq!(r.model.as_deref(), Some("mock-model"));
+    assert!(r.reply.is_some_and(|t| t.chars().count() <= 80));
+}
+
+#[tokio::test]
+async fn connection_check_classifies_failures() {
+    for (code, expected) in [
+        (StatusCode::UNAUTHORIZED, CheckOutcome::KeyRejected),
+        (StatusCode::NOT_FOUND, CheckOutcome::ModelOrEndpointNotFound),
+        (StatusCode::TOO_MANY_REQUESTS, CheckOutcome::RateLimited),
+        (StatusCode::BAD_GATEWAY, CheckOutcome::ProviderError),
+    ] {
+        let app = Router::new().route("/v1/responses", post(move || async move { (code, "{}") }));
+        let s = settings(ProviderId::Openai, spawn(app).await, 5_000);
+        let r = check_connection(&reqwest::Client::new(), &s, ProviderId::Openai).await;
+        assert_eq!(r.outcome, expected, "{code}");
+        assert_eq!(r.http_status, Some(code.as_u16()));
+        assert!(r.reply.is_none());
+    }
+    // Timeout and unreachable.
+    let app = Router::new().route(
+        "/v1/responses",
+        post(|| async {
+            tokio::time::sleep(Duration::from_millis(500)).await;
+            "{}"
+        }),
+    );
+    let s = settings(ProviderId::Xai, spawn(app).await, 50);
+    let r = check_connection(&reqwest::Client::new(), &s, ProviderId::Xai).await;
+    assert_eq!(r.outcome, CheckOutcome::Timeout);
+    let s = settings(ProviderId::Gemini, "http://127.0.0.1:1".into(), 2_000);
+    let r = check_connection(&reqwest::Client::new(), &s, ProviderId::Gemini).await;
+    assert_eq!(r.outcome, CheckOutcome::Unreachable);
+    // Live switched off or provider missing: no request at all.
+    let mut s = settings(ProviderId::Gemini, "http://127.0.0.1:1".into(), 2_000);
+    s.live_enabled = false;
+    let r = check_connection(&reqwest::Client::new(), &s, ProviderId::Gemini).await;
+    assert_eq!(r.outcome, CheckOutcome::LiveDisabled);
+    let r = check_connection(
+        &reqwest::Client::new(),
+        &settings(ProviderId::Gemini, String::new(), 1),
+        ProviderId::Openai,
+    )
+    .await;
+    assert_eq!(r.outcome, CheckOutcome::NotConfigured);
+}

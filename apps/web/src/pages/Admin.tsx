@@ -5,6 +5,9 @@ import {
   ROLE_LABELS,
   type AuditEvent,
   type Catalog,
+  type CheckOutcome,
+  type ProviderCheck,
+  type ProviderInfo,
   type Invitation,
   type Member,
   type Membership,
@@ -352,6 +355,7 @@ export function ProvidersPage() {
                   <th scope="col">Provider</th>
                   <th scope="col">Status</th>
                   <th scope="col">Model</th>
+                  <th scope="col">Connection</th>
                   <th scope="col">Data handling</th>
                 </tr>
               </thead>
@@ -369,6 +373,9 @@ export function ProvidersPage() {
                     <td>
                       <code>{p.model ?? "—"}</code>
                     </td>
+                    <td>
+                      <ConnectionCell org={org} provider={p} canTest={can(m, "members_manage")} onDone={catalog.reload} />
+                    </td>
                     <td className="small">{p.data_handling}</td>
                   </tr>
                 ))}
@@ -377,6 +384,7 @@ export function ProvidersPage() {
           </TableWrap>
         )}
       </section>
+      {catalog.data && <SetupGuide live={catalog.data.live_enabled} />}
       <section className="card stack" aria-labelledby="usage-h">
         <div className="row-between">
           <h2 id="usage-h">Usage records</h2>
@@ -512,5 +520,110 @@ function Pager({ offset, hasMore, onChange }: { offset: number; hasMore: boolean
         Older
       </button>
     </nav>
+  );
+}
+
+const CHECK_LABELS: Record<CheckOutcome, string> = {
+  working: "Working",
+  live_disabled: "Live requests off",
+  not_configured: "Not configured",
+  key_rejected: "Key rejected",
+  model_or_endpoint_not_found: "Model not found",
+  request_rejected: "Request rejected",
+  rate_limited: "Rate limited / no quota",
+  provider_error: "Provider error",
+  timeout: "Timed out",
+  unreachable: "Unreachable",
+};
+
+/** Last connection check and the "Test connection" action. A check sends
+ *  one fixed "reply OK" request (≤ 16 output tokens, no customer data). */
+function ConnectionCell({
+  org,
+  provider,
+  canTest,
+  onDone,
+}: {
+  org: string;
+  provider: ProviderInfo;
+  canTest: boolean;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const c = provider.last_check;
+
+  async function test() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post<ProviderCheck>(`/orgs/${org}/provider-checks`, { provider: provider.id });
+      onDone();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="stack" aria-live="polite">
+      {c ? (
+        <>
+          <StatusBadge
+            status={c.outcome === "working" ? "success" : c.outcome === "rate_limited" || c.outcome === "timeout" ? "pending" : "failure"}
+            label={`${CHECK_LABELS[c.outcome]}${c.http_status ? ` (HTTP ${c.http_status})` : ""}`}
+          />
+          <span className="small muted">
+            {c.outcome === "working" || c.http_status ? `${c.latency_ms} ms · ` : ""}checked {formatDate(c.checked_at)} by{" "}
+            {c.checked_by}
+          </span>
+          {c.outcome !== "working" && <span className="small">{c.advice}</span>}
+        </>
+      ) : (
+        <span className="small muted">Not checked since the server started</span>
+      )}
+      {error && <span className="small field-error">{error}</span>}
+      {canTest && provider.status === "configured" && (
+        <div>
+          <button type="button" className="btn small" disabled={busy} onClick={() => void test()}>
+            {busy ? "Testing…" : `Test ${provider.vendor}`}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SetupGuide({ live }: { live: boolean }) {
+  return (
+    <section className="card stack" aria-labelledby="setup-h">
+      <h2 id="setup-h">How to connect an AI provider (API mode)</h2>
+      <p className="small muted">
+        Web Connect needs none of this: it works with people&apos;s own ChatGPT, Claude, Gemini and Grok accounts. API mode lets
+        QUORUM call a provider directly with a key your organization pays for.
+      </p>
+      {!live && (
+        <div className="notice warn" role="status">
+          Live requests are currently switched off on this server, so no provider can be contacted.
+        </div>
+      )}
+      <ol className="stack">
+        <li>
+          Create an API key in the provider&apos;s developer console and note an exact model identifier from its model list.
+        </li>
+        <li>
+          On the server (for example Railway → service → Variables), set <code>QUORUM_PROVIDERS_LIVE=1</code> and, per provider,{" "}
+          <code>OPENAI_API_KEY</code>/<code>OPENAI_MODEL</code>, <code>ANTHROPIC_API_KEY</code>/<code>ANTHROPIC_MODEL</code>,{" "}
+          <code>GEMINI_API_KEY</code>/<code>GEMINI_MODEL</code> or <code>XAI_API_KEY</code>/<code>XAI_MODEL</code>. The service
+          restarts with the new values.
+        </li>
+        <li>
+          Come back here and press <strong>Test</strong> for each provider. <em>Working</em> means the provider accepted the key
+          and model for one tiny request; anything else shows the reason and what to change.
+        </li>
+      </ol>
+      <p className="small muted">Keys stay on the server. They are never shown here, sent to browsers or written to the audit trail.</p>
+    </section>
   );
 }

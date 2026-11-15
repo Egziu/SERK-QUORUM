@@ -10,6 +10,7 @@ All notable changes are recorded here. Versions follow semantic versioning once 
 - **Council:** compare up to 12 responses side by side (tabs on phones), replace with history, annotations, per-person ratings on eight criteria, human decision recording into the Decision register, frozen completed councils, Markdown export and save as Studio document.
 - Migration `0002_web_connect_council.sql` with RLS, least-privilege grants, immutability triggers and provenance CHECK.
 - CI `container` job: Docker image build, smoke test (`scripts/container-smoke.sh`) and CycloneDX SBOMs.
+- **Provider connection check:** owners and administrators can press *Test* per provider on *Providers & usage*. It sends one fixed "reply OK" request (≤ 16 output tokens, no customer data) and reports Working or the exact reason (key rejected, model not found, rate limited/no quota, timeout, unreachable, …) with advice. Throttled and audited. A setup guide on the same page lists the server variables.
 - Docs: WEB_CONNECT, COUNCIL, MEMORY (planned), PROVIDER_POLICY_MATRIX, ADR 0005, v0.3 baseline.
 
 ### Changed

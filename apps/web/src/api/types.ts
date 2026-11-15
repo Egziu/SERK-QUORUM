@@ -191,6 +191,31 @@ export interface ProviderInfo {
   capabilities: string[];
   data_handling: string;
   fixture_available: boolean;
+  last_check: ProviderCheck | null;
+}
+
+export type CheckOutcome =
+  | "working"
+  | "live_disabled"
+  | "not_configured"
+  | "key_rejected"
+  | "model_or_endpoint_not_found"
+  | "request_rejected"
+  | "rate_limited"
+  | "provider_error"
+  | "timeout"
+  | "unreachable";
+
+export interface ProviderCheck {
+  provider: ProviderId;
+  model: string | null;
+  outcome: CheckOutcome;
+  http_status: number | null;
+  latency_ms: number;
+  reply: string | null;
+  advice: string;
+  checked_at: string;
+  checked_by: string;
 }
 
 export interface Catalog {

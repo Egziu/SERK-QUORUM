@@ -390,6 +390,154 @@ pub async fn complete_live(
     })
 }
 
+/// The fixed text of a connection check. Contains no customer data.
+pub const CHECK_PROMPT: &str = "Connection check from SERK QUORUM. Reply with the single word OK.";
+/// Output cap for a connection check: enough for "OK", as cheap as possible.
+pub const CHECK_MAX_OUTPUT_TOKENS: u32 = 16;
+
+/// Result of a connection check. `Working` means the provider accepted an
+/// authenticated request for the configured model (HTTP 2xx); it says
+/// nothing about quotas for longer requests or about answer quality.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckOutcome {
+    Working,
+    LiveDisabled,
+    NotConfigured,
+    KeyRejected,
+    ModelOrEndpointNotFound,
+    RequestRejected,
+    RateLimited,
+    ProviderError,
+    Timeout,
+    Unreachable,
+}
+
+impl CheckOutcome {
+    pub fn from_status(status: u16) -> Self {
+        match status {
+            200..=299 => Self::Working,
+            401 | 403 => Self::KeyRejected,
+            404 => Self::ModelOrEndpointNotFound,
+            429 => Self::RateLimited,
+            500..=599 => Self::ProviderError,
+            _ => Self::RequestRejected,
+        }
+    }
+
+    /// Plain-language explanation and the next step for an administrator.
+    pub fn advice(self) -> &'static str {
+        match self {
+            Self::Working => {
+                "The provider accepted the key and the model. Live requests should work."
+            }
+            Self::LiveDisabled => {
+                "Live requests are switched off. Set QUORUM_PROVIDERS_LIVE=1 on the server to enable them."
+            }
+            Self::NotConfigured => {
+                "No key or model is set. Set <PROVIDER>_API_KEY and <PROVIDER>_MODEL on the server and restart."
+            }
+            Self::KeyRejected => {
+                "The provider rejected the API key (401/403). Check that the key is correct, active and allowed to use this model."
+            }
+            Self::ModelOrEndpointNotFound => {
+                "The provider did not find the model (404). Check the <PROVIDER>_MODEL value against the provider's model list."
+            }
+            Self::RequestRejected => {
+                "The provider rejected the request. This is usually an invalid model name or an account restriction."
+            }
+            Self::RateLimited => {
+                "The provider is rate-limiting this key or the account has no remaining quota or credit (429)."
+            }
+            Self::ProviderError => "The provider had a server error (5xx). Try again later.",
+            Self::Timeout => {
+                "The provider did not answer in time. Try again; if it persists, raise QUORUM_PROVIDER_TIMEOUT_SECONDS."
+            }
+            Self::Unreachable => {
+                "The server could not reach the provider. Check outbound network access (firewall, proxy, DNS)."
+            }
+        }
+    }
+}
+
+/// Report of one connection check.
+#[derive(Debug, Clone, Serialize)]
+pub struct CheckReport {
+    pub provider: ProviderId,
+    pub model: Option<String>,
+    pub outcome: CheckOutcome,
+    pub http_status: Option<u16>,
+    pub latency_ms: u64,
+    /// The provider's reply text, when one came back (truncated to 80 characters).
+    pub reply: Option<String>,
+}
+
+/// Sends one minimal, fixed request to verify that the configured key and
+/// model are accepted. Never sends customer data. The caller is responsible
+/// for authorization, throttling and auditing.
+pub async fn check_connection(
+    client: &reqwest::Client,
+    settings: &ProviderSettings,
+    provider: ProviderId,
+) -> CheckReport {
+    let model = settings.model(provider).map(str::to_owned);
+    let report = |outcome, http_status, latency_ms, reply| CheckReport {
+        provider,
+        model: model.clone(),
+        outcome,
+        http_status,
+        latency_ms,
+        reply,
+    };
+    if !settings.live_enabled {
+        return report(CheckOutcome::LiveDisabled, None, 0, None);
+    }
+    let Some(config) = settings.configs.get(&provider) else {
+        return report(CheckOutcome::NotConfigured, None, 0, None);
+    };
+    let req = CompletionRequest {
+        provider,
+        task: Task::Review,
+        prompt: CHECK_PROMPT,
+    };
+    let http = build_request(&req, config, CHECK_MAX_OUTPUT_TOKENS);
+    let started = Instant::now();
+    let mut builder = client
+        .post(&http.url)
+        .timeout(settings.timeout)
+        .json(&http.body);
+    for (name, value) in &http.headers {
+        builder = builder.header(*name, value);
+    }
+    let result = builder.send().await;
+    let elapsed = || u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+    match result {
+        Err(e) => {
+            let outcome = match classify(e) {
+                ProviderError::Timeout => CheckOutcome::Timeout,
+                _ => CheckOutcome::Unreachable,
+            };
+            report(outcome, None, elapsed(), None)
+        }
+        Ok(response) => {
+            let status = response.status().as_u16();
+            let outcome = CheckOutcome::from_status(status);
+            let reply = if outcome == CheckOutcome::Working {
+                read_bounded(response)
+                    .await
+                    .ok()
+                    .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+                    .and_then(|v| parse_response(provider, &v).ok())
+                    .map(|(text, _)| truncate_chars(text.trim().to_owned(), 80).0)
+            } else {
+                None
+            };
+            tracing::info!(provider = %provider, status, ?outcome, "provider connection check");
+            report(outcome, Some(status), elapsed(), reply)
+        }
+    }
+}
+
 fn classify(e: reqwest::Error) -> ProviderError {
     if e.is_timeout() {
         ProviderError::Timeout
@@ -454,6 +602,24 @@ mod tests {
             urls.iter().all(|u| !u.contains('?') && !u.contains('#')),
             "no query strings: nothing can leak via URL"
         );
+    }
+
+    #[test]
+    fn check_outcomes_map_http_status() {
+        assert_eq!(CheckOutcome::from_status(200), CheckOutcome::Working);
+        assert_eq!(CheckOutcome::from_status(401), CheckOutcome::KeyRejected);
+        assert_eq!(CheckOutcome::from_status(403), CheckOutcome::KeyRejected);
+        assert_eq!(
+            CheckOutcome::from_status(404),
+            CheckOutcome::ModelOrEndpointNotFound
+        );
+        assert_eq!(
+            CheckOutcome::from_status(400),
+            CheckOutcome::RequestRejected
+        );
+        assert_eq!(CheckOutcome::from_status(429), CheckOutcome::RateLimited);
+        assert_eq!(CheckOutcome::from_status(503), CheckOutcome::ProviderError);
+        assert!(!CHECK_PROMPT.is_empty() && CHECK_MAX_OUTPUT_TOKENS <= 16);
     }
 
     #[test]

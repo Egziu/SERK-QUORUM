@@ -27,7 +27,8 @@ Responsibilities that stay with the organization and the person:
 | Default | Disabled (`QUORUM_PROVIDERS_LIVE=0`) | Disabled | Disabled | Disabled |
 | Enabled only when | Live mode on **and** server-side key **and** model configured, and the person acknowledges the external transfer per request | same | same | same |
 | Credentials | Server environment only; never sent to the browser or stored in the database | same | same | same |
-| Status shown | Disabled / Not configured / Configured (unverified) | same | same | same |
+| Status shown | Disabled / Not configured / Configured, plus the last connection check (Working, Key rejected, Model not found, …) | same | same | same |
+| Connection check | Owners/administrators press Test: one fixed "reply OK" request, ≤ 16 output tokens, no customer data; audited | same | same | same |
 | Data-handling note shown in UI | From the provider registry (`data_handling`) | same | same | same |
 
 ## Review status

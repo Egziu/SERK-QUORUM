@@ -1,7 +1,10 @@
 use crate::config::Config;
 use crate::throttle::Throttle;
+use quorum_providers::{CheckReport, ProviderId};
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
+use time::OffsetDateTime;
 use tokio::sync::Semaphore;
 
 #[derive(Clone)]
@@ -18,6 +21,19 @@ pub struct Inner {
     /// Live provider requests per user (cooldown).
     pub provider_throttle: Throttle,
     pub provider_slots: Semaphore,
+    /// Last connection check per provider (server-wide, like the keys). Kept
+    /// in memory: after a restart the status is "not checked yet".
+    pub provider_checks: Mutex<BTreeMap<ProviderId, LastCheck>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct LastCheck {
+    #[serde(flatten)]
+    pub report: CheckReport,
+    pub advice: &'static str,
+    #[serde(with = "time::serde::rfc3339")]
+    pub checked_at: OffsetDateTime,
+    pub checked_by: String,
 }
 
 impl AppState {
@@ -39,6 +55,7 @@ impl AppState {
                 login_throttle: Throttle::new(5, std::time::Duration::from_secs(15 * 60)),
                 provider_throttle: Throttle::new(1, cooldown),
                 provider_slots: Semaphore::new(slots),
+                provider_checks: Mutex::new(BTreeMap::new()),
                 config,
                 pool,
                 http,
@@ -48,6 +65,14 @@ impl AppState {
 
     pub fn config(&self) -> &Config {
         &self.inner.config
+    }
+
+    pub fn last_check(&self, p: ProviderId) -> Option<LastCheck> {
+        self.inner
+            .provider_checks
+            .lock()
+            .ok()
+            .and_then(|m| m.get(&p).cloned())
     }
 
     pub fn pool(&self) -> &PgPool {

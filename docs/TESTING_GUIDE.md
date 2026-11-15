@@ -6,15 +6,15 @@ Tests use deterministic synthetic data (`*@example.test`, "Atlas Engineering (sy
 
 | # | Category (directive §30) | Where | Count (v0.3) |
 | --- | --- | --- | --- |
-| 1–2 | Unit & domain invariants | `crates/*/src` `#[cfg(test)]`, `apps/api/src` | domain 29, auth 7, providers 13, api 15 |
+| 1–2 | Unit & domain invariants | `crates/*/src` `#[cfg(test)]`, `apps/api/src` | domain 29, auth 7, providers 14, api 15 |
 | 3 | Database integration | `apps/api/tests/*` (real PostgreSQL, non-owner role) | 30 (incl. 7 in `web_connect.rs`) |
 | 4 | Migrations | `database::migrations_are_recorded_and_idempotent`; every test migrates a fresh DB | incl. above |
 | 5 | API contract | `apps/api/tests/contract.rs` (spec ↔ route list ↔ router) | 2 |
 | 6 | Authorization | `apps/api/tests/authorization.rs` (all 8 roles × 8 actions) | 4 |
 | 7 | Tenant isolation | `apps/api/tests/tenant_isolation.rs` (API, direct SQL, pool leakage) | 4 + Connect/Council isolation in `web_connect.rs` |
 | 8 | Cryptography vectors | SHA-256 FIPS 180-2 "abc" vector; Argon2id round-trip (`quorum-auth`) | 2 |
-| 9 | Provider fixtures | `crates/quorum-providers` (recorded-shape JSON + local mock HTTP server) | 18 |
-| 10 | Frontend components | `apps/web/src/**/*.test.ts(x)` (Vitest + Testing Library) | 18 |
+| 9 | Provider fixtures | `crates/quorum-providers` (recorded-shape JSON + local mock HTTP server, incl. connection check) | 22 |
+| 10 | Frontend components | `apps/web/src/**/*.test.ts(x)` (Vitest + Testing Library) | 20 |
 | 11–12 | Browser E2E + accessibility | `apps/web/e2e/run.mjs` (Playwright + axe-core, WCAG 2.0–2.2 A/AA rules) | 1 flow incl. Web Connect → Council, 16 page states |
 | — | Container image | `scripts/container-smoke.sh` in CI job `container` (migrate, health, web client, non-root, SIGTERM) + CycloneDX SBOM | CI only (sandbox cannot build the image) |
 | 13 | Backup restoration | manual drill, see BACKUP_AND_RECOVERY.md | not automated |
@@ -54,8 +54,8 @@ All commands exited 0. PostgreSQL 16 local, synthetic data only.
 | --- | --- |
 | `cargo fmt --all -- --check` | pass |
 | `cargo clippy --workspace --all-targets --locked -- -D warnings` | pass |
-| `cargo test --workspace --locked` | 100 passed, 0 failed, 0 ignored |
-| `npm run typecheck && npm test && npm run build` (apps/web) | 18 passed; build OK |
+| `cargo test --workspace --locked` | 100 passed, 0 failed, 0 ignored (104 after the provider connection check was added) |
+| `npm run typecheck && npm test && npm run build` (apps/web) | 18 passed (20 after the connection check); build OK |
 | `node e2e/run.mjs` | E2E PASSED; 16 page states, 0 axe violations |
 | `npm run check` (legacy/v0.1-node) | 9 passed |
 | `cargo audit` / `npm audit --audit-level=high` | pass (documented exception RUSTSEC-2026-0459) / 0 vulnerabilities |

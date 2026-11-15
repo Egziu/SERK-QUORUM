@@ -192,3 +192,102 @@ async fn live_request_through_mock_provider_records_usage() {
     assert_eq!(item["input_tokens"], 11);
     db.drop().await;
 }
+
+#[tokio::test]
+async fn connection_check_verifies_key_and_model_without_customer_data() {
+    use axum::routing::post;
+    // Anthropic mock accepts; OpenAI mock rejects the key.
+    let mock = axum::Router::new()
+        .route(
+            "/v1/messages",
+            post(|body: String| async move {
+                assert!(body.contains("Connection check from SERK QUORUM"));
+                r#"{"content":[{"type":"text","text":"OK"}],"usage":{"input_tokens":30,"output_tokens":1}}"#
+            }),
+        )
+        .route(
+            "/v1/responses",
+            post(|| async { (StatusCode::UNAUTHORIZED, r#"{"error":"bad key"}"#) }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        let _ = axum::serve(listener, mock).await;
+    });
+
+    let db = TestDb::create().await;
+    let mut config = test_config(&[
+        ("QUORUM_PROVIDERS_LIVE", "1"),
+        ("ANTHROPIC_API_KEY", "synthetic-test-key"),
+        ("ANTHROPIC_MODEL", "mock-model"),
+        ("OPENAI_API_KEY", "synthetic-wrong-key"),
+        ("OPENAI_MODEL", "mock-model"),
+        ("QUORUM_PROVIDER_COOLDOWN_SECONDS", "60"),
+    ]);
+    for p in [ProviderId::Anthropic, ProviderId::Openai] {
+        config.providers.configs.get_mut(&p).unwrap().base_url = format!("http://{addr}");
+    }
+    let app = app(&db, config);
+    let (mut owner, org) = signup(&app, "owner", "Org").await;
+    let path = format!("/api/v1/orgs/{org}/provider-checks");
+
+    // Not checked yet: the catalog says so instead of claiming anything.
+    let catalog = owner.get(&format!("/api/v1/orgs/{org}/providers")).await;
+    assert!(
+        catalog.body["providers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|p| p["last_check"].is_null())
+    );
+
+    let r = owner.post(&path, json!({ "provider": "anthropic" })).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text);
+    assert_eq!(r.body["outcome"], "working");
+    assert_eq!(r.body["http_status"], 200);
+    assert_eq!(r.body["reply"], "OK");
+    assert_eq!(r.body["checked_by"], "owner");
+
+    let r = owner.post(&path, json!({ "provider": "openai" })).await;
+    assert_eq!(r.body["outcome"], "key_rejected", "{}", r.text);
+    assert!(r.body["advice"].as_str().unwrap().contains("API key"));
+
+    // Unconfigured provider: answered locally, nothing is sent.
+    let r = owner.post(&path, json!({ "provider": "gemini" })).await;
+    assert_eq!(r.body["outcome"], "not_configured", "{}", r.text);
+
+    // Repeating too soon is throttled per provider.
+    let r = owner.post(&path, json!({ "provider": "anthropic" })).await;
+    assert_eq!(r.status, StatusCode::TOO_MANY_REQUESTS, "{}", r.text);
+
+    // The catalog shows the latest result to every member.
+    let catalog = owner.get(&format!("/api/v1/orgs/{org}/providers")).await;
+    let find = |id: &str| {
+        catalog.body["providers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(find("anthropic")["last_check"]["outcome"], "working");
+    assert_eq!(find("openai")["last_check"]["outcome"], "key_rejected");
+
+    // Only owners/administrators may run a check.
+    let (mut contributor, _) = add_member(&app, &mut owner, &org, "carol", "contributor").await;
+    let r = contributor
+        .post(&path, json!({ "provider": "gemini" }))
+        .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+
+    // Audited with metadata only (never the key).
+    let audit = owner
+        .get(&format!("/api/v1/orgs/{org}/audit-events?limit=50"))
+        .await;
+    assert!(audit.text.contains("provider.connection_checked"));
+    assert!(
+        !audit.text.contains("synthetic-test-key") && !audit.text.contains("synthetic-wrong-key")
+    );
+    db.drop().await;
+}
