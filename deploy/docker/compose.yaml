@@ -1,0 +1,40 @@
+# Local development stack with synthetic data only. Not a production profile:
+# passwords below are development placeholders and cookies are not Secure
+# because local traffic is plain HTTP.
+#   docker compose -f deploy/docker/compose.yaml up --build
+name: serk-quorum-dev
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: dev-superuser-only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../../scripts/bootstrap-db.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      retries: 20
+
+  migrate:
+    build: { context: ../.., dockerfile: deploy/docker/Dockerfile }
+    command: ["migrate"]
+    environment:
+      QUORUM_MIGRATION_DATABASE_URL: postgres://quorum_owner:quorum_owner_dev@postgres:5432/quorum_dev
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    build: { context: ../.., dockerfile: deploy/docker/Dockerfile }
+    environment:
+      DATABASE_URL: postgres://quorum_api:quorum_api_dev@postgres:5432/quorum_dev
+      QUORUM_ALLOW_SIGNUP: "1"
+      QUORUM_COOKIE_SECURE: "0"
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:

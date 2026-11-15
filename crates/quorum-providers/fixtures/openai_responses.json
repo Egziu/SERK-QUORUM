@@ -1,0 +1,16 @@
+{
+  "id": "resp_fixture_0001",
+  "object": "response",
+  "status": "completed",
+  "model": "fixture-model",
+  "output": [
+    {"type": "reasoning", "id": "rs_fixture", "summary": []},
+    {
+      "type": "message",
+      "id": "msg_fixture",
+      "role": "assistant",
+      "content": [{"type": "output_text", "text": "Plan outline.", "annotations": []}]
+    }
+  ],
+  "usage": {"input_tokens": 64, "output_tokens": 12, "total_tokens": 76}
+}

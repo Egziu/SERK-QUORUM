@@ -1,0 +1,15 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {"text": "Internal reasoning that must not be shown.", "thought": true},
+          {"text": "Visible answer."}
+        ]
+      },
+      "finishReason": "STOP"
+    }
+  ],
+  "usageMetadata": {"promptTokenCount": 70, "candidatesTokenCount": 31, "totalTokenCount": 101}
+}

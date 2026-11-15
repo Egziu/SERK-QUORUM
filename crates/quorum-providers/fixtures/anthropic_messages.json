@@ -1,0 +1,13 @@
+{
+  "id": "msg_fixture_0001",
+  "type": "message",
+  "role": "assistant",
+  "model": "fixture-model",
+  "content": [
+    {"type": "text", "text": "First block."},
+    {"type": "tool_use", "id": "ignored", "name": "ignored", "input": {}},
+    {"type": "text", "text": "Second block."}
+  ],
+  "stop_reason": "end_turn",
+  "usage": {"input_tokens": 120, "output_tokens": 48}
+}

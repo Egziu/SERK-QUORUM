@@ -1,0 +1,49 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/quorum-domain",
+    "crates/quorum-auth",
+    "crates/quorum-storage",
+    "crates/quorum-providers",
+    "apps/api",
+]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.88"
+license = "LicenseRef-SERK-Proprietary"
+publish = false
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+panic = "warn"
+
+[workspace.dependencies]
+quorum-domain = { path = "crates/quorum-domain" }
+quorum-auth = { path = "crates/quorum-auth" }
+quorum-storage = { path = "crates/quorum-storage" }
+quorum-providers = { path = "crates/quorum-providers" }
+
+axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio", "tower-log", "matched-path", "macros"] }
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "net", "time"] }
+tower = { version = "0.5.3", features = ["util", "limit", "timeout"] }
+tower-http = { version = "0.7.1", features = ["fs", "trace", "set-header", "limit", "util", "timeout"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "time", "json", "macros", "migrate"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls"] }
+uuid = { version = "1.29.2", features = ["v4", "v7", "serde"] }
+time = { version = "0.3.55", features = ["serde", "formatting", "parsing", "macros"] }
+thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+argon2 = { version = "0.6.0", features = ["zeroize"] }
+sha2 = "0.11.1"
+getrandom = "0.3"
+base64 = "0.23.1"
+subtle = "2.6"

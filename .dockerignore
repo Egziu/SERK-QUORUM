@@ -1,0 +1,7 @@
+target
+**/node_modules
+apps/web/dist
+apps/web/test-results
+.env
+.env.*
+.git

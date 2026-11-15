@@ -1,0 +1,11 @@
+# cargo-audit configuration. Every ignored advisory needs a justification and
+# an owner to revisit it; see docs/security/DEPENDENCY_EXCEPTIONS.md.
+[advisories]
+ignore = [
+  # libsqlite3-sys (SQLite CVE): recorded in Cargo.lock only through an
+  # optional sqlx feature; QUORUM does not enable SQLite and the crate is not
+  # compiled for any target (`cargo tree --target all -i libsqlite3-sys` is
+  # empty). sqlx 0.9.0 pins a range excluding the fix. Remove when sqlx
+  # publishes a release accepting libsqlite3-sys >= 0.39.
+  "RUSTSEC-2026-0459",
+]
